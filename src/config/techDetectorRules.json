@@ -1,0 +1,28 @@
+[
+  { "name": "React", "file": "package.json", "keyword": "react" },
+  { "name": "Angular", "file": "package.json", "keyword": "angular" },
+  { "name": "Vue", "file": "package.json", "keyword": "vue" },
+  { "name": "Svelte", "file": "package.json", "keyword": "svelte" },
+  { "name": "Next.js", "file": "next.config.js", "keyword": null },
+  { "name": "Express", "file": "package.json", "keyword": "express" },
+  { "name": "NestJS", "file": "package.json", "keyword": "@nestjs" },
+  { "name": "GraphQL", "file": "package.json", "keyword": "graphql" },
+  { "name": "Prisma", "file": "package.json", "keyword": "prisma" },
+  { "name": "TypeORM", "file": "package.json", "keyword": "typeorm" },
+
+  { "name": "Jest", "file": "package.json", "keyword": "jest" },
+  { "name": "Cypress", "file": "package.json", "keyword": "cypress" },
+  { "name": "Vite", "file": "package.json", "keyword": "vite" },
+
+  { "name": "Django", "file": "manage.py", "keyword": null },
+  { "name": "Flask", "file": "requirements.txt", "keyword": "flask" },
+  { "name": "RubyOnRails", "file": "Gemfile", "keyword": "rails" },
+
+  { "name": ".NET", "file": ".csproj", "keyword": null },
+  { "name": "DockerCompose", "file": "docker-compose.yml", "keyword": null },
+  { "name": "Docker", "file": "Dockerfile", "keyword": null },
+
+  { "name": "Kafka", "file": "pom.xml", "keyword": "kafka" },
+  { "name": "SpringBoot", "file": "pom.xml", "keyword": "spring-boot" }
+]
+

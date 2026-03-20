@@ -1,0 +1,22 @@
+<% if (!Array.isArray(rows) || rows.length === 0) { %>
+  <div class="muted">No experience found.</div>
+<% } else { %>
+  <div class="cvList">
+    <% for (const r of rows) { %>
+      <div class="cvItem">
+        <div class="cvTopRow">
+          <div class="cvLeft">
+            <div class="cvTitle"><%= r?.title ?? "" %></div>
+            <div class="cvCompany"><%= r?.company ?? "" %></div>
+          </div>
+          <div class="cvRight">
+            <div class="cvDates"><%= r?.dates ?? "" %></div>
+            <div class="cvLocation"><%= r?.location ?? "" %></div>
+          </div>
+        </div>
+        <div class="cvDescription"><%= r?.description ?? "" %></div>
+      </div>
+    <% } %>
+  </div>
+<% } %>
+

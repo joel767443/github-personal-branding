@@ -1,0 +1,35 @@
+<div class="monitoringShell">
+  <div class="row headerRow">
+    <div class="navTabs" role="tablist" aria-label="Monitoring tabs">
+      <button
+        class="tabBtn"
+        type="button"
+        data-monitoring-tab="runs"
+        aria-selected="<%= activeTab === "runs" ? "true" : "false" %>"
+      >
+        Runs
+      </button>
+      <button
+        class="tabBtn"
+        type="button"
+        data-monitoring-tab="health"
+        aria-selected="<%= activeTab === "health" ? "true" : "false" %>"
+      >
+        Health
+      </button>
+      <button
+        class="tabBtn"
+        type="button"
+        data-monitoring-tab="failures"
+        aria-selected="<%= activeTab === "failures" ? "true" : "false" %>"
+      >
+        Failures
+      </button>
+    </div>
+  </div>
+
+  <div id="monitoringTabContent" class="row">
+    <div class="muted">Loading…</div>
+  </div>
+</div>
+

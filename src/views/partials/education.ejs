@@ -1,0 +1,165 @@
+<%
+  function asText(v) {
+    return v == null ? "" : String(v);
+  }
+
+  function extractFirstUrl(s) {
+    const t = asText(s);
+    const m = t.match(/https?:\/\/[^\s)]+/i);
+    return m ? m[0] : "";
+  }
+%>
+
+<div class="row">
+  <h2 class="eduSectionTitle">Education</h2>
+  <% const eduRows = Array.isArray(education) ? education : []; %>
+  <% if (eduRows.length === 0) { %>
+    <div class="muted">No education found.</div>
+  <% } else { %>
+    <div class="eduDegreeGrid" role="list">
+      <% for (const r of eduRows) { %>
+        <div class="eduDegreeCard" role="listitem">
+          <div class="eduCardHeader">
+            <div class="eduCardIcon eduCardIcon--cap" aria-hidden="true">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 3 2 8l10 5 10-5-10-5Z"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M6 10v5c0 1.5 3 3 6 3s6-1.5 6-3v-5"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+            <div class="eduCardText">
+              <div class="eduCardTitle"><%= asText(r?.degree) %></div>
+              <div class="eduCardSubtitle"><%= asText(r?.institution) %></div>
+              <% const meta = [asText(r?.dates), asText(r?.location)].filter(Boolean).join(" · "); %>
+              <% if (meta) { %>
+                <div class="eduCardMeta"><%= meta %></div>
+              <% } %>
+            </div>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+
+<div class="row mt-12">
+  <h2 class="eduSectionTitle">Certifications</h2>
+  <% const certRows = Array.isArray(certifications) ? certifications : []; %>
+  <% if (certRows.length === 0) { %>
+    <div class="muted">No certifications found.</div>
+  <% } else { %>
+    <div class="eduCertList" role="list">
+      <% for (const r of certRows) { 
+        const title = asText(r?.name);
+        const issuer = asText(r?.issuer);
+        const issued = asText(r?.issued);
+        const url = extractFirstUrl(issuer) || extractFirstUrl(issued);
+
+        const lc = `${title} ${issuer} ${issued}`.toLowerCase();
+        const kind = lc.includes("cisco") ? "cisco" : lc.includes("php") ? "php" : "generic";
+      %>
+        <div class="eduCertCard" role="listitem">
+          <div class="eduCertCardIcon eduCertCardIcon--<%= kind %>" aria-hidden="true">
+            <% if (kind === "cisco") { %>
+              <div class="eduCertLogoText eduCertLogoText--cisco">cisco</div>
+            <% } else if (kind === "php") { %>
+              <div class="eduCertLogoText eduCertLogoText--php">php</div>
+            <% } else { %>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M7 3h10a2 2 0 0 1 2 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 0 1 2-2Z"
+                  stroke="currentColor"
+                  stroke-width="1.7"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            <% } %>
+          </div>
+
+          <div class="eduCertCardBody">
+            <div class="eduCertTitleRow">
+              <div class="eduCertTitle"><%= title %></div>
+              <% if (url) { %>
+                <a class="eduCertActionBtn" href="<%= url %>" target="_blank" rel="noreferrer">
+                  Read Full Article
+                </a>
+              <% } %>
+            </div>
+            <% if (issuer) { %>
+              <div class="eduCertSubtitle"><%= issuer %></div>
+            <% } %>
+            <% if (issued) { %>
+              <div class="eduCertIssued"><%= issued %></div>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+
+<div class="row mt-12">
+  <h2 class="eduSectionTitle">Publications</h2>
+  <% const pubRows = Array.isArray(publications) ? publications : []; %>
+  <% if (pubRows.length === 0) { %>
+    <div class="muted">No publications found.</div>
+  <% } else { %>
+    <div class="eduCertList" role="list">
+      <% for (const r of pubRows) { 
+        const title = asText(r?.title);
+        const publisher = asText(r?.publisher);
+        const date = asText(r?.date);
+        const url = asText(r?.url);
+        const description = asText(r?.description);
+      %>
+        <div class="eduCertCard" role="listitem">
+          <div class="eduCertCardIcon eduCertCardIcon--generic" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 4h16v16H4V4Z"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M8 8h8M8 12h8M8 16h6"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
+            </svg>
+          </div>
+
+          <div class="eduCertCardBody">
+            <div class="eduCertTitleRow">
+              <div class="eduCertTitle"><%= title %></div>
+              <% if (url) { %>
+                <a class="eduCertActionBtn" href="<%= url %>" target="_blank" rel="noreferrer">
+                  Read Full Article
+                </a>
+              <% } %>
+            </div>
+            <% const meta = [publisher, date].filter(Boolean).join(" · "); %>
+            <% if (meta) { %>
+              <div class="eduCertSubtitle"><%= meta %></div>
+            <% } %>
+            <% if (description) { %>
+              <div class="eduCertIssued"><%= description %></div>
+            <% } %>
+          </div>
+        </div>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+

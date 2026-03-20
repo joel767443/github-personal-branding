@@ -1,0 +1,33 @@
+<div class="twoCol">
+  <div>
+    <h2>Profile</h2>
+    <div class="row profileColumn">
+      <% if (profile?.avatarUrl) { %>
+        <img class="dashboardAvatarLarge" src="<%= profile.avatarUrl %>" alt="Profile avatar" />
+      <% } %>
+      <div><%= profile?.name ?? "" %></div>
+      <div class="muted"><%= profile?.email ?? "" %></div>
+      <div class="muted"><%= profile?.phoneNumber ?? "" %></div>
+      <div class="muted">
+        <%= profile?.hireable == null ? "" : (profile.hireable ? "Hireable: Yes" : "Hireable: No") %>
+      </div>
+    </div>
+
+    <div class="row">
+      <label>Created</label>
+      <div class="muted"><%= profile?.createdAt ? formatDateTime(profile.createdAt) : "" %></div>
+    </div>
+    <div class="row">
+      <label>Updated</label>
+      <div class="muted"><%= profile?.updatedAt ? formatDateTime(profile.updatedAt) : "" %></div>
+    </div>
+  </div>
+
+  <div>
+    <h3>Job Title</h3>
+    <div class="muted"><%= profile?.summary ?? "" %></div>
+    <h3>Summary</h3>
+    <div class="muted"><%= profile?.linkedinSummary ?? "" %></div>
+  </div>
+</div>
+

@@ -1,0 +1,42 @@
+<% if (!Array.isArray(projects) || projects.length === 0) { %>
+  <div class="muted">No projects found.</div>
+<% } else { %>
+  <div class="cvList">
+    <% for (const r of projects) { %>
+      <% const title = r?.title ?? ""; %>
+      <% const source = r?.source ?? ""; %>
+      <% const dates = r?.dates ?? ""; %>
+      <% const description = r?.description ?? ""; %>
+      <% const hasHref = Boolean(r?.urlHref); %>
+      <% const urlText = r?.urlText ?? ""; %>
+      <div class="cvItem">
+        <div class="cvTopRow">
+          <div class="cvLeft">
+            <div class="cvTitle">
+              <% if (hasHref && title) { %>
+                <a href="<%= r.urlHref %>" target="_blank" rel="noopener noreferrer"><%= title %></a>
+              <% } else { %>
+                <%= title %>
+              <% } %>
+            </div>
+            <div class="cvCompany"><%= source %></div>
+          </div>
+          <div class="cvRight">
+            <div class="cvDates"><%= dates %></div>
+          </div>
+        </div>
+
+        <div class="cvDescription"><%= description %></div>
+
+        <% if (hasHref && urlText) { %>
+          <div class="cvProjectUrl">
+            <a href="<%= r.urlHref %>" target="_blank" rel="noopener noreferrer"><%= urlText %></a>
+          </div>
+        <% } else if (urlText) { %>
+          <div class="cvProjectUrl"><%= urlText %></div>
+        <% } %>
+      </div>
+    <% } %>
+  </div>
+<% } %>
+

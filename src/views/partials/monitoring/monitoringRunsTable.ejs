@@ -1,0 +1,44 @@
+<% if (!Array.isArray(runs) || runs.length === 0) { %>
+  <div class="muted">No runs found.</div>
+<% } else { %>
+  <table class="dataTable">
+    <thead>
+      <tr>
+        <th>Run ID</th>
+        <th>Job Type</th>
+        <th>Status</th>
+        <th>User</th>
+        <th>Developer ID</th>
+        <th>Started</th>
+        <th>Finished</th>
+        <th>Summary</th>
+        <th>Events</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (const r of runs) { %>
+        <tr>
+          <td><%= r?.id ?? "" %></td>
+          <td><%= r?.jobType ?? "" %></td>
+          <td><%= r?.status ?? "" %></td>
+          <td><%= r?.userLogin ?? "" %></td>
+          <td><%= r?.developerId ?? "" %></td>
+          <td><%= formatDateTime(r?.startedAt) %></td>
+          <td><%= formatDateTime(r?.finishedAt) %></td>
+          <td><%= r?.summary ?? "" %></td>
+          <td>
+            <button
+              class="tabBtn"
+              type="button"
+              data-monitoring-action="events"
+              data-run-id="<%= r?.id ?? "" %>"
+            >
+              View events
+            </button>
+          </td>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+<% } %>
+

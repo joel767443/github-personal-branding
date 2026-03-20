@@ -1,0 +1,41 @@
+<%
+  const defs = [
+    { key: "repos", label: "Repos" },
+    { key: "projects", label: "Projects" },
+  ];
+  const allowed = new Set(defs.map((d) => d.key));
+  const initial = allowed.has(activeTab) ? activeTab : "repos";
+%>
+
+<div class="row headerRow">
+  <div class="navTabs" role="tablist" aria-label="Portfolio tabs">
+    <% for (const d of defs) { %>
+      <% const isActive = d.key === initial; %>
+      <button
+        class="tabBtn"
+        type="button"
+        data-portfolio-tab="<%= d.key %>"
+        aria-selected="<%= isActive ? "true" : "false" %>"
+      >
+        <%= d.label %>
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<div id="portfolioTabContent" class="row">
+  <% for (const d of defs) { %>
+    <% const isActive = d.key === initial; %>
+    <div
+      class="portfolioTabPanel<%= isActive ? "" : " hidden" %>"
+      data-portfolio-panel="<%= d.key %>"
+    >
+      <% if (d.key === "repos") { %>
+        <%- include("repos", { repos }) %>
+      <% } else { %>
+        <%- include("projects", { projects }) %>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+

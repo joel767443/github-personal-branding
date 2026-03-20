@@ -1,0 +1,36 @@
+<% if (!Array.isArray(repos) || repos.length === 0) { %>
+  <div class="muted">No repos found.</div>
+<% } else { %>
+  <div class="repoGrid">
+    <% for (const repo of repos) { %>
+      <% const name = repo?.name ?? "Unnamed repo"; %>
+      <% const description = repo?.description ?? ""; %>
+      <% const visibility = repo?.visibility ?? "Public"; %>
+      <% const techLine = repo?.topLanguagesText ?? "No language data"; %>
+      <% const hasUrl = Boolean(repo?.urlHref); %>
+      <% const urlText = repo?.urlText ?? ""; %>
+      <article class="repoCard">
+        <div class="repoCardHeader">
+          <h3 class="repoName">
+            <% if (hasUrl && name) { %>
+              <a href="<%= repo.urlHref %>" target="_blank" rel="noopener noreferrer"><%= name %></a>
+            <% } else { %>
+              <%= name %>
+            <% } %>
+          </h3>
+          <span class="repoBadge"><%= visibility %></span>
+        </div>
+        <p class="repoDescription"><%= description || "No description provided." %></p>
+        <div class="repoTech">
+          <span class="repoTechLabel">Tech:</span> <%= techLine %>
+        </div>
+        <% if (hasUrl && urlText) { %>
+          <div class="cvProjectUrl">
+            <a href="<%= repo.urlHref %>" target="_blank" rel="noopener noreferrer"><%= urlText %></a>
+          </div>
+        <% } %>
+      </article>
+    <% } %>
+  </div>
+<% } %>
+

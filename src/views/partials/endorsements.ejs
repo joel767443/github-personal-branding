@@ -1,0 +1,38 @@
+<%
+  const defs = [
+    { key: "endorsements", label: "Endorsements" },
+    { key: "recommendations", label: "Recommendations" },
+  ];
+  const allowed = new Set(defs.map((d) => d.key));
+  const initial = allowed.has(activeTab) ? activeTab : "endorsements";
+  const tabRows = { endorsements, recommendations };
+%>
+
+<div class="row headerRow">
+  <div class="navTabs" role="tablist" aria-label="Endorsements tabs">
+    <% for (const d of defs) { %>
+      <% const isActive = d.key === initial; %>
+      <button
+        class="tabBtn"
+        type="button"
+        data-endorsement-tab="<%= d.key %>"
+        aria-selected="<%= isActive ? "true" : "false" %>"
+      >
+        <%= d.label %>
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<div id="endorsementTabContent" class="row">
+  <% for (const d of defs) { %>
+    <% const isActive = d.key === initial; %>
+    <div
+      class="endorsementTabPanel<%= isActive ? "" : " hidden" %>"
+      data-endorsement-panel="<%= d.key %>"
+    >
+      <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+    </div>
+  <% } %>
+</div>
+

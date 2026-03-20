@@ -1,0 +1,32 @@
+<% const safeRows = Array.isArray(rows) ? rows : []; %>
+<% if (safeRows.length === 0) { %>
+  <div class="muted">No data found.</div>
+<% } else { %>
+  <% const columns = [...new Set(safeRows.flatMap((r) => Object.keys(r ?? {})))]; %>
+  <table class="dataTable">
+    <thead>
+      <tr>
+        <% for (const c of columns) { %>
+          <th><%= columnLabel(c) %></th>
+        <% } %>
+      </tr>
+    </thead>
+    <tbody>
+      <% for (const row of safeRows) { %>
+        <tr>
+          <% for (const c of columns) { %>
+            <% const value = row?.[c]; %>
+            <% if (value == null) { %>
+              <td></td>
+            <% } else if (typeof value === "object") { %>
+              <td><pre><%= JSON.stringify(value, null, 2) %></pre></td>
+            <% } else { %>
+              <td><%= value %></td>
+            <% } %>
+          <% } %>
+        </tr>
+      <% } %>
+    </tbody>
+  </table>
+<% } %>
+

@@ -1,0 +1,43 @@
+<%
+  const defs = [
+    { key: "skills", label: "Skills" },
+    { key: "developer-tech-stacks", label: "Developer Tech Stacks" },
+    { key: "architectures", label: "Architectures" },
+  ];
+  const allowed = new Set(defs.map((d) => d.key));
+  const initial = allowed.has(activeTab) ? activeTab : "skills";
+  const tabRows = { skills, "developer-tech-stacks": developerTechStacks, architectures };
+%>
+
+<div class="row headerRow">
+  <div class="navTabs" role="tablist" aria-label="Skills tabs">
+    <% for (const d of defs) { %>
+      <% const isActive = d.key === initial; %>
+      <button
+        class="tabBtn"
+        type="button"
+        data-skills-tab="<%= d.key %>"
+        aria-selected="<%= isActive ? "true" : "false" %>"
+      >
+        <%= d.label %>
+      </button>
+    <% } %>
+  </div>
+</div>
+
+<div id="skillsTabContent" class="row">
+  <% for (const d of defs) { %>
+    <% const isActive = d.key === initial; %>
+    <div
+      class="skillsTabPanel<%= isActive ? "" : " hidden" %>"
+      data-skills-panel="<%= d.key %>"
+    >
+      <% if (d.key === "architectures") { %>
+        <%- include("_architectureFootprint", { rows: architectures, totalRepos: overview?.repos ?? 0 }) %>
+      <% } else { %>
+        <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+      <% } %>
+    </div>
+  <% } %>
+</div>
+

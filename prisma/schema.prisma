@@ -1,0 +1,329 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// Database URL: set DATABASE_URL in .env (see .example.env). Do not paste connection strings here.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Developer {
+  id            Int       @id @default(autoincrement())
+  firstName     String?  @map("first_name")
+  lastName      String?  @map("last_name")
+  email         String   @unique
+  mobileNumber  String?  @map("mobile_number")
+  headline      String?
+  summary       String?
+  linkedinSummary String? @map("linkedin_summary")
+  profilePic    String?  @map("profile_pic")
+  jobTitle      String?  @map("job_title")
+  hireable      Boolean? @map("hireable")
+  createdAt     DateTime @map("created_at") @default(now())
+  updatedAt     DateTime @map("updated_at") @updatedAt
+
+  repos             Repo[]
+  developerTechStack DeveloperTechStack[]
+  developerArchitectures DeveloperArchitecture[]
+  certifications       Certification[]
+  developerExperiences DeveloperExperience[]
+  educations           Education[]
+  projects             Project[]
+  developerLinkedinSkills    DeveloperLinkedinSkill[]
+  developerLinkedinReceivedEndorsements DeveloperLinkedinReceivedEndorsement[]
+  developerRecommendations   DeveloperRecommendation[]
+  developerPublications     DeveloperPublication[]
+
+  @@map("developers")
+}
+
+model Repo {
+  id          String   @id
+  name        String
+  fullName    String
+  description String
+  languages   Languages[]
+  developerId Int?
+
+  developer   Developer? @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  private     Boolean
+  url         String
+  createdAt   DateTime
+  updatedAt   DateTime
+
+  commits         Commit[]
+  repoTechStacks  RepoTechStack[]
+}
+
+/// Per-repo tech detected from rules (file / keyword). Developer is implied via `repo.developerId`.
+model RepoTechStack {
+  id     Int    @id @default(autoincrement())
+  repoId String @map("repo_id")
+  name   String
+  score  Float
+
+  repo Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@unique([repoId, name])
+  @@index([repoId])
+  @@map("repo_tech_stacks")
+}
+
+model Commit {
+  id        String   @id
+  message   String
+  author    String
+  date      DateTime
+  repoId    String
+
+  repo      Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+}
+
+model Languages {
+  id          String @id
+  name        String
+  percentage  Float
+  bytes       BigInt?
+  repoId      String
+
+  repo      Repo @relation(fields: [repoId], references: [id], onDelete: Cascade)
+}
+
+model DeveloperTechStack {
+  id           Int      @id @default(autoincrement())
+  developerId  Int
+  name         String
+  percentage   Float
+  createdAt    DateTime @default(now())
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([developerId, name])
+  @@map("developer_tech_stacks")
+}
+
+model TechDetectorRule {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  file      String
+  keyword   String?
+  createdAt DateTime @default(now())
+
+  @@map("tech_detector_rules")
+}
+
+model Architecture {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  count Int
+
+  developerArchitectures DeveloperArchitecture[]
+
+  @@map("architectures")
+}
+
+model DeveloperArchitecture {
+  id           Int    @id @default(autoincrement())
+  developerId  Int
+  name         String
+  count        Int
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  architecture Architecture @relation(fields: [name], references: [name], onDelete: Cascade)
+
+  @@unique([developerId, name])
+  @@map("developer_architectures")
+}
+
+model Certification {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  name         String?
+  issuer       String?
+  issued       String?
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("certifications")
+}
+
+model DeveloperExperience {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  title        String?
+  company      String?
+  dates        String?
+  location     String?
+  description  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("developer_experiences")
+}
+
+model Education {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  degree       String?
+  institution  String?
+  dates        String?
+  location     String?
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("education")
+}
+
+model LanguageCatalog {
+  id                 Int               @id @default(autoincrement())
+  name               String            @unique
+  projectLanguages   ProjectLanguage[]
+
+  @@map("language_catalog")
+}
+
+model Project {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  title        String?
+  description  String?
+  url          String?
+  dates        String?
+  source       String  @default("linkedin")
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+  projectLanguages ProjectLanguage[]
+
+  @@index([developerId])
+  @@map("projects")
+}
+
+model ProjectLanguage {
+  projectId   Int     @map("project_id")
+  languageId  Int     @map("language_id")
+  percentage  Float
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  language    LanguageCatalog @relation(fields: [languageId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, languageId])
+  @@map("project_languages")
+}
+
+model DeveloperLinkedinSkill {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  name         String
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([developerId, name])
+  @@index([developerId])
+  @@map("developer_linkedin_skills")
+}
+
+/// Skills other members endorsed you for (LinkedIn export, e.g. Endorsements_Info.csv).
+model DeveloperLinkedinReceivedEndorsement {
+  id                  Int     @id @default(autoincrement())
+  developerId         Int     @map("developer_id")
+  skillName           String? @map("skill_name")
+  endorserFirstName   String? @map("endorser_first_name")
+  endorserLastName    String? @map("endorser_last_name")
+  endorserCompany     String? @map("endorser_company")
+  endorserJobTitle    String? @map("endorser_job_title")
+  endorsedOn          String? @map("endorsed_on")
+  sortOrder           Int     @default(0) @map("sort_order")
+  developer           Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("developer_linkedin_received_endorsements")
+}
+
+model DeveloperRecommendation {
+  id                     Int     @id @default(autoincrement())
+  developerId            Int     @map("developer_id")
+  recommenderFirstName   String? @map("recommender_first_name")
+  recommenderLastName    String? @map("recommender_last_name")
+  jobTitle               String? @map("job_title")
+  company                String?
+  relationship           String?
+  text                   String?
+  date                   String?
+  sortOrder              Int     @default(0) @map("sort_order")
+  developer              Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("developer_recommendations")
+}
+
+model DeveloperPublication {
+  id           Int     @id @default(autoincrement())
+  developerId  Int     @map("developer_id")
+  title        String?
+  publisher    String?
+  date         String?
+  url          String?
+  description  String?
+  sortOrder    Int     @default(0) @map("sort_order")
+  developer    Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@index([developerId])
+  @@map("developer_publications")
+}
+
+model JobRun {
+  id          String    @id
+  jobType     String    @map("job_type")
+  status      String
+  startedAt   DateTime  @default(now()) @map("started_at")
+  finishedAt  DateTime? @map("finished_at")
+  userLogin   String?   @map("user_login")
+  developerId Int?      @map("developer_id")
+  summary     String?
+  metadata    Json?
+
+  events   JobEvent[]
+  failures JobFailure[]
+
+  @@index([jobType, startedAt])
+  @@index([status, startedAt])
+  @@index([developerId, startedAt])
+  @@map("job_runs")
+}
+
+model JobEvent {
+  id        Int      @id @default(autoincrement())
+  runId     String   @map("run_id")
+  level     String   @default("info")
+  label     String
+  payload   Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  run JobRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, createdAt])
+  @@index([level, createdAt])
+  @@map("job_events")
+}
+
+model JobFailure {
+  id          Int      @id @default(autoincrement())
+  runId       String   @map("run_id")
+  code        String?
+  message     String
+  details     Json?
+  stack       String?
+  occurredAt  DateTime @default(now()) @map("occurred_at")
+
+  run JobRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId, occurredAt])
+  @@index([occurredAt])
+  @@map("job_failures")
+}

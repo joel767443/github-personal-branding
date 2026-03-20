@@ -1,0 +1,39 @@
+<%
+  const n = Number(totalRepos ?? 0) || 0;
+  const list = Array.isArray(rows) ? [...rows] : [];
+  list.sort((a, b) => Number(b?.count ?? 0) - Number(a?.count ?? 0));
+%>
+
+<div class="architectureFootprint">
+  <div class="architectureFootprint-header"></div>
+  <table class="architectureFootprint-table">
+    <thead>
+      <tr>
+        <th scope="col">Architecture</th>
+        <th scope="col" class="architectureFootprint-num">Repos</th>
+        <th scope="col" class="architectureFootprint-num">Share</th>
+      </tr>
+    </thead>
+    <% if (list.length === 0) { %>
+      <tbody>
+        <tr>
+          <td colspan="3" class="architectureFootprint-empty">No architecture patterns detected yet.</td>
+        </tr>
+      </tbody>
+    <% } else { %>
+      <tbody>
+        <% for (const row of list) { %>
+          <% const name = row?.name ?? row?.architecture?.name ?? ""; %>
+          <% const count = Number(row?.count ?? 0); %>
+          <% const share = n > 0 ? `${((count / n) * 100).toFixed(1)}%` : "0.0%"; %>
+          <tr>
+            <td class="architectureFootprint-arch"><%= name %></td>
+            <td class="architectureFootprint-num"><%= count %></td>
+            <td class="architectureFootprint-num"><%= share %></td>
+          </tr>
+        <% } %>
+      </tbody>
+    <% } %>
+  </table>
+</div>
+

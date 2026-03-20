@@ -1,0 +1,28 @@
+{
+  "name": "github-intel-service",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "deploy-portfolio": "node scripts/deployPortfolio.js",
+    "deploy-portfolio:regen": "node scripts/deployPortfolio.js --regenerate"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.5.0",
+    "@prisma/client": "^7.5.0",
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.6",
+    "csv-parse": "^6.2.0",
+    "dotenv": "^17.3.1",
+    "ejs": "^5.0.1",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "multer": "^2.1.1",
+    "pg": "^8.20.0",
+    "prisma": "^7.5.0"
+  }
+}

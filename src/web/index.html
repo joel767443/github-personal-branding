@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDBS setup</title>
+    <link rel="stylesheet" href="/styles/pdbs.css" />
+  </head>
+  <body>
+    <div class="page-container">
+      <div id="shellSidebar"></div>
+
+      <div class="right_col">
+        <div class="container">
+      <div id="shellTopNav"></div>
+
+      <div class="hidden" id="dashboardCard">
+        <div class="tileRow">
+          <div class="tileCount"><div class="tileTitle">Repos</div><div class="tileValue" id="statRepos"></div><div class="tileDelta">Owned repos processed</div></div>
+          <div class="tileCount"><div class="tileTitle">Commits</div><div class="tileValue" id="statCommits"></div><div class="tileDelta">Across your repos</div></div>
+          <div class="tileCount"><div class="tileTitle">Skills (LinkedIn)</div><div class="tileValue" id="statSkills"></div><div class="tileDelta">Profile skills</div></div>
+          <div class="tileCount"><div class="tileTitle">Endorsements</div><div class="tileValue" id="statEndorsements"></div><div class="tileDelta">Received</div></div>
+        </div>
+        <div class="tileRow">
+          <div class="tileCount"><div class="tileTitle">Recommendations</div><div class="tileValue" id="statRecommendations"></div><div class="tileDelta">LinkedIn</div></div>
+          <div class="tileCount"><div class="tileTitle">Experience</div><div class="tileValue" id="statExperiences"></div><div class="tileDelta">Roles</div></div>
+          <div class="tileCount"><div class="tileTitle">Publications</div><div class="tileValue" id="statPublications"></div><div class="tileDelta">Articles &amp; posts</div></div>
+          <div class="tileCount"><div class="tileTitle">Failures (24h)</div><div class="tileValue" id="statFailures24h"></div><div class="tileDelta">Pipeline failures</div></div>
+        </div>
+        <div class="tileRow">
+          <div class="tileCount"><div class="tileTitle">Architecture catalog</div><div class="tileValue" id="statArchitectures"></div><div class="tileDelta">Global categories</div></div>
+          <div class="tileCount"><div class="tileTitle">Your tech stacks</div><div class="tileValue" id="statDeveloperTechStacks"></div><div class="tileDelta">Detected rules</div></div>
+          <div class="tileCount"><div class="tileTitle">Your arch patterns</div><div class="tileValue" id="statDeveloperArchitectures"></div><div class="tileDelta">Repo patterns</div></div>
+          <div class="tileCount"><div class="tileTitle">Monitoring</div><div class="tileValue" id="statRunningJobs"></div><div class="tileDelta" id="statLastJobStatus">Last sync / import</div></div>
+        </div>
+        <div class="dashboardCharts" id="dashboardCharts">
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Monitoring — runs &amp; failures (30 days)</div>
+            <div class="chartCanvasWrap"><canvas id="chartMonitoringLine" aria-label="Runs and failures by day"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Job status</div>
+            <div class="chartCanvasWrap chartCanvasWrapShort"><canvas id="chartJobStatus" aria-label="Job status distribution"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Job type</div>
+            <div class="chartCanvasWrap chartCanvasWrapShort"><canvas id="chartJobType" aria-label="Job type distribution"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Endorsements by skill</div>
+            <div class="chartCanvasWrap"><canvas id="chartEndorsements" aria-label="Endorsements by skill"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Developer tech stack (%)</div>
+            <div class="chartCanvasWrap"><canvas id="chartTechStack" aria-label="Tech stack percentages"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Architecture patterns (repos)</div>
+            <div class="chartCanvasWrap"><canvas id="chartArchitecture" aria-label="Architecture pattern counts"></canvas></div>
+          </div>
+          <div class="chartPanel">
+            <div class="chartPanelTitle">Experience</div>
+            <div class="chartCanvasWrap"><canvas id="chartExperience" aria-label="Experience roles"></canvas></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="dataPageCard">
+        <div id="dataPageSubtitle" class="muted"></div>
+        <div id="dataPageContent" class="row"></div>
+      </div>
+
+      <div class="card hidden" id="loginCard">
+        <h2>Sign in to continue</h2>
+        <div class="row">
+          <div class="muted">Login is required before we can sync your GitHub data.</div>
+        </div>
+        <div class="row">
+          <button id="loginPageBtn">Login with GitHub</button>
+        </div>
+        <div class="row">
+          <div id="loginMsg" class="muted"></div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="setupCard">
+        <div class="step">Step 1</div>
+        <h2>Initial Setup</h2>
+        <div class="grid">
+          <div><label>PORT</label><input id="port" placeholder="3000" value="3000" /></div>
+          <div><label>GitHub Username</label><input id="githubUsername" placeholder="octocat" /></div>
+          <div><label>GitHub Token</label><input id="githubToken" type="password" placeholder="ghp_xxx" /></div>
+          <div><label>GitHub OAuth Client ID</label><input id="githubClientId" /></div>
+          <div><label>GitHub OAuth Client Secret</label><input id="githubClientSecret" type="password" /></div>
+          <div><label>DB Host</label><input id="dbHost" placeholder="localhost" value="localhost" /></div>
+          <div><label>DB Port</label><input id="dbPort" placeholder="5432" value="5432" /></div>
+          <div><label>DB User</label><input id="dbUser" placeholder="developer" value="developer" /></div>
+          <div><label>DB Password</label><input id="dbPassword" type="password" /></div>
+          <div><label>DB Name</label><input id="dbName" placeholder="developer" value="personal_developer_branding" /></div>
+        </div>
+        <div class="row mt-12">
+          <button id="saveSetupBtn">Save Setup</button>
+        </div>
+        <div id="setupMsg" class="muted"></div>
+      </div>
+
+      <div class="card hidden" id="syncCard">
+        <h2>Sync GitHub Data</h2>
+        <div class="row">
+          <button id="startSyncBtn">Start Sync</button>
+          <span id="syncState" class="muted">Idle</span>
+        </div>
+        <div class="log" id="progressLog"></div>
+      </div>
+
+      <div class="card hidden" id="uploadCard">
+        <div id="linkedin-upload" class="hidden"></div>
+        <h2>Upload LinkedIn Export</h2>
+        <div class="row">
+          <span class="muted">GitHub sync is complete. Upload your LinkedIn ZIP export to continue.</span>
+        </div>
+        <div class="row">
+          <label for="linkedinZip">LinkedIn ZIP file</label>
+          <input id="linkedinZip" type="file" accept=".zip" />
+        </div>
+        <div class="row">
+          <button id="uploadLinkedinZipBtn">Upload ZIP</button>
+        </div>
+        <div id="uploadStatus" class="muted"></div>
+        <div class="log" id="linkedinProgressLog" aria-live="polite"></div>
+      </div>
+
+        <footer class="pdbsFooter">Personal Developer Branding System</footer>
+        </div>
+      </div>
+    </div>
+    <script src="/shell.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="/app.js"></script>
+  </body>
+  </html>
+

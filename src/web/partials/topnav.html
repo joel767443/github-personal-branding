@@ -1,0 +1,36 @@
+<div class="top_nav" id="topNav" align="right">
+  <div class="nav_menu">
+    <h2 id="pageTitle">Dashboard</h2>
+    <button id="profileTabBtn" class="tabBtn hidden ml-auto" type="button">Profile</button>
+
+    <nav class="nav navbar-nav ms-auto">
+      <ul class="navbar-right">
+        <li class="nav-item">
+          <span id="notificationIcon" class="notificationIcon" title="Notifications" role="img" aria-label="Notifications">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2Z" fill="#e8ecff"/>
+              <path d="M18 16v-5c0-3.1-1.6-5.3-4.5-6V4a1.5 1.5 0 1 0-3 0v1c-2.9.7-4.5 2.9-4.5 6v5l-2 2v1h18v-1l-2-2Z" fill="#e8ecff"/>
+            </svg>
+            <span class="notifBadge" id="notificationBadge">6</span>
+          </span>
+        </li>
+
+        <li class="nav-item">
+          <button id="loginBtn" class="menuBtn hidden">Login with GitHub</button>
+        </li>
+
+        <li class="nav-item dropdown">
+          <button id="userMenuButton" class="userMenuBtn hidden" type="button">
+            <img id="topUserAvatar" class="topUserAvatar hidden" alt="User avatar" />
+            <span id="topUserLogin" class="topUserLogin"></span>
+            <span>▼</span>
+          </button>
+
+          <div id="userMenuDropdown" class="menuDropdown">
+            <span id="logoutBtn">Logout</span>
+          </div>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</div>
