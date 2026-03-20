@@ -10,10 +10,13 @@
  * (`node scripts/deployPortfolio.js`) after generatePortfolioOutput — no second regeneration.
  *
  * Env:
- *   DEPLOY_REPO_URL          — default git@github.com:joel767443/joel767443.git
+ *   DEPLOY_REPO_URL          — default git@github.com:joel767443/joel767443.git (profile README repo)
+ *   DEPLOY_README_REMOTE     — remote name in the temp clone; default readme (matches `git remote add readme …`)
  *   DEPLOY_BRANCH            — default main
  *   DEPLOY_PORTFOLIO_AFTER_SYNC — set to 1/true to push from the sync pipeline
  *   PORTFOLIO_DEVELOPER_ID   — developer id when using CLI --regenerate only
+ *
+ * Push this service’s own code with `npm run push:origin` (uses remote origin, e.g. github-personal-branding).
  */
 
 const fs = require("fs");
@@ -26,6 +29,8 @@ const PORTFOLIO_DIR = path.join(ROOT, "portfolio");
 
 const DEFAULT_REPO = "git@github.com:joel767443/joel767443.git";
 const DEFAULT_BRANCH = "main";
+/** Remote name for the README/profile repo clone (not the service repo’s `origin`). */
+const DEFAULT_README_REMOTE = "readme";
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -119,9 +124,9 @@ function commitIfNeeded(cloneDir, log, gitInherit) {
   return true;
 }
 
-function pullRebaseWithReadmeFix(cloneDir, branch, env, log, gitInherit) {
+function pullRebaseWithReadmeFix(cloneDir, branch, remote, env, log, gitInherit) {
   try {
-    runGit(cloneDir, ["pull", "--rebase", "origin", branch], gitInherit);
+    runGit(cloneDir, ["pull", "--rebase", remote, branch], gitInherit);
   } catch (e) {
     const readmePath = path.join(cloneDir, "README.md");
     if (hasConflictMarkers(readmePath)) {
@@ -147,6 +152,7 @@ function pullRebaseWithReadmeFix(cloneDir, branch, env, log, gitInherit) {
  * @param {(msg: string, extra?: object) => void} [options.log] — default console.log
  * @param {string} [options.repoUrl]
  * @param {string} [options.branch]
+ * @param {string} [options.readmeRemote] — remote name for README repo (default readme)
  * @param {boolean} [options.gitInherit] — pass git output to terminal (default true)
  * @returns {{ pushed: boolean, skipped: boolean, message?: string }}
  */
@@ -161,12 +167,16 @@ function deployPortfolioFiles(options = {}) {
   const gitInherit = options.gitInherit !== false;
   const repoUrl = options.repoUrl || process.env.DEPLOY_REPO_URL || DEFAULT_REPO;
   const branch = options.branch || process.env.DEPLOY_BRANCH || DEFAULT_BRANCH;
+  const readmeRemote =
+    options.readmeRemote ||
+    process.env.DEPLOY_README_REMOTE ||
+    DEFAULT_README_REMOTE;
 
   const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "portfolio-deploy-"));
   const cloneDir = path.join(tmpBase, "repo");
   try {
-    log(`Portfolio deploy: cloning ${repoUrl} …`);
-    runGit(tmpBase, ["clone", repoUrl, cloneDir], gitInherit);
+    log(`Portfolio deploy: cloning ${repoUrl} (remote ${readmeRemote}) …`);
+    runGit(tmpBase, ["clone", "-o", readmeRemote, repoUrl, cloneDir], gitInherit);
 
     log("Portfolio deploy: copying portfolio files …");
     copyPortfolioInto(cloneDir);
@@ -179,11 +189,11 @@ function deployPortfolioFiles(options = {}) {
 
     const gitEnv = { GIT_EDITOR: "true" };
     try {
-      runGit(cloneDir, ["push", "origin", branch], gitInherit);
+      runGit(cloneDir, ["push", readmeRemote, branch], gitInherit);
     } catch (firstPush) {
-      log("Portfolio deploy: push rejected; rebasing onto origin …");
-      pullRebaseWithReadmeFix(cloneDir, branch, gitEnv, log, gitInherit);
-      runGit(cloneDir, ["push", "origin", branch], gitInherit);
+      log(`Portfolio deploy: push rejected; rebasing onto ${readmeRemote} …`);
+      pullRebaseWithReadmeFix(cloneDir, branch, readmeRemote, gitEnv, log, gitInherit);
+      runGit(cloneDir, ["push", readmeRemote, branch], gitInherit);
     }
 
     log(`Portfolio deploy: pushed to ${repoUrl} (${branch}).`);
@@ -223,4 +233,5 @@ module.exports = {
   deployPortfolioFiles,
   DEFAULT_REPO,
   DEFAULT_BRANCH,
+  DEFAULT_README_REMOTE,
 };
