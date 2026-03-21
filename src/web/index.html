@@ -137,20 +137,10 @@
       <div class="card hidden" id="loginCard">
         <h2>Sign in to continue</h2>
         <div class="row">
-          <div class="muted">Use GitHub OAuth or register with email and password.</div>
+          <div class="muted">Sign in with GitHub. Email/password sign-up and sign-in are only exposed as <code>POST /auth/register</code> and <code>POST /auth/login</code> (JSON body: <code>email</code>, <code>password</code>).</div>
         </div>
         <div class="row">
           <button id="loginPageBtn">Login with GitHub</button>
-        </div>
-        <div class="row grid" style="max-width: 420px">
-          <div><label>Email</label><input id="registerEmail" type="email" autocomplete="email" /></div>
-          <div><label>Password</label><input id="registerPassword" type="password" autocomplete="new-password" /></div>
-          <div><button type="button" id="registerBtn">Register</button></div>
-        </div>
-        <div class="row grid" style="max-width: 420px">
-          <div><label>Email</label><input id="loginEmailField" type="email" autocomplete="email" /></div>
-          <div><label>Password</label><input id="loginPasswordField" type="password" autocomplete="current-password" /></div>
-          <div><button type="button" id="emailLoginBtn">Sign in</button></div>
         </div>
         <div class="row">
           <div id="loginMsg" class="muted"></div>

@@ -71,12 +71,6 @@ const githubOauthClientIdInput = document.getElementById("githubOauthClientIdInp
 const githubOauthCallbackUrlInput = document.getElementById("githubOauthCallbackUrlInput");
 const githubOauthClientSecretInput = document.getElementById("githubOauthClientSecretInput");
 const clearGithubOauthClientSecret = document.getElementById("clearGithubOauthClientSecret");
-const registerEmail = document.getElementById("registerEmail");
-const registerPassword = document.getElementById("registerPassword");
-const registerBtn = document.getElementById("registerBtn");
-const loginEmailField = document.getElementById("loginEmailField");
-const loginPasswordField = document.getElementById("loginPasswordField");
-const emailLoginBtn = document.getElementById("emailLoginBtn");
 const loginCard = document.getElementById("loginCard");
 const loginPageBtn = document.getElementById("loginPageBtn");
 const loginMsg = document.getElementById("loginMsg");
@@ -1253,42 +1247,6 @@ startSyncBtn.addEventListener("click", () => {
   startSync();
 });
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
-
-registerBtn?.addEventListener("click", async () => {
-  if (!registerEmail || !registerPassword) return;
-  try {
-    const out = await getJson("/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: registerEmail.value,
-        password: registerPassword.value,
-      }),
-    });
-    if (loginMsg) loginMsg.textContent = "Registered. You can continue.";
-    await refreshStatus();
-  } catch (err) {
-    if (loginMsg) loginMsg.textContent = err.message || String(err);
-  }
-});
-
-emailLoginBtn?.addEventListener("click", async () => {
-  if (!loginEmailField || !loginPasswordField) return;
-  try {
-    await getJson("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: loginEmailField.value,
-        password: loginPasswordField.value,
-      }),
-    });
-    if (loginMsg) loginMsg.textContent = "Signed in.";
-    await refreshStatus();
-  } catch (err) {
-    if (loginMsg) loginMsg.textContent = err.message || String(err);
-  }
-});
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;
