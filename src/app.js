@@ -29,7 +29,9 @@ const {
   ensureEnvFromExample,
   readCurrentEnv,
   ENV_PATH,
+  ensureSessionSecret,
 } = require('./config/runtimeConfig');
+ensureSessionSecret();
 const { ensureUploadsDir, UPLOADS_DIR, linkedinExportZipPath } = require('./config/uploadsDir');
 const { executeLinkedinImportPipeline } = require('./jobs/linkedinPipeline');
 const { resolveDeveloperFromSession } = require('./services/sessionDeveloperService');
@@ -632,8 +634,13 @@ app.post('/auth/register', async (req, res) => {
   try {
     const rawEmail = String(req.body?.email ?? '').trim();
     const password = req.body?.password;
+    const firstName = String(req.body?.firstName ?? '').trim();
+    const lastName = String(req.body?.lastName ?? '').trim();
     if (!rawEmail || !password) {
       return respondError(res, 400, 'Invalid input', 'email and password required');
+    }
+    if (!firstName || !lastName) {
+      return respondError(res, 400, 'Invalid input', 'first name and last name required');
     }
     const existing = await prisma.user.findUnique({ where: { email: rawEmail } });
     if (existing) return respondError(res, 409, 'Exists', 'Email already registered');
@@ -645,6 +652,8 @@ app.post('/auth/register', async (req, res) => {
       data: {
         email: rawEmail,
         userId: user.id,
+        firstName,
+        lastName,
         subscriptionStatus: 'trialing',
       },
     });
@@ -660,6 +669,7 @@ app.post('/auth/register', async (req, res) => {
       login: rawEmail,
       email: rawEmail,
       developerId: dev.id,
+      name: `${firstName} ${lastName}`.trim(),
     };
     res.json({ ok: true, developerId: dev.id });
   } catch (err) {

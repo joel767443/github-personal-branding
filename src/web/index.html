@@ -135,40 +135,60 @@
       </div>
 
       <div class="card hidden" id="loginCard">
-        <h2>Sign in to continue</h2>
-        <div class="row">
-          <div class="muted">Sign in with GitHub. Email/password sign-up and sign-in are only exposed as <code>POST /auth/register</code> and <code>POST /auth/login</code> (JSON body: <code>email</code>, <code>password</code>).</div>
-        </div>
-        <div class="row">
-          <button id="loginPageBtn">Login with GitHub</button>
-        </div>
-        <div class="row">
-          <div id="loginMsg" class="muted"></div>
-        </div>
-      </div>
-
-      <div class="card hidden" id="setupCard">
-        <div class="step">Step 1</div>
-        <h2>Initial Setup</h2>
-        <div class="row">
-          <div class="muted" style="max-width: 520px">
-            Per-developer GitHub access and deploy targets are stored in the database after users sign in with GitHub or use settings — not in <code>.env</code>.
+        <div id="serverConfigHint" class="auth-hint muted hidden"></div>
+        <div id="loginPanel">
+          <h2>Sign in</h2>
+          <p class="muted auth-intro">Use your email and password. Per-developer GitHub access and deploy targets are stored in the database after you connect GitHub in settings.</p>
+          <div class="row auth-field">
+            <label for="loginEmail">Email</label>
+            <input id="loginEmail" type="email" autocomplete="username" />
+          </div>
+          <div class="row auth-field">
+            <label for="loginPassword">Password</label>
+            <input id="loginPassword" type="password" autocomplete="current-password" />
+          </div>
+          <div class="row">
+            <button type="button" id="btnLoginSubmit">Sign in</button>
+          </div>
+          <div class="row">
+            <a href="#" id="linkShowRegister" class="auth-switch">Create an account</a>
+          </div>
+          <div class="row auth-divider muted">or</div>
+          <div class="row">
+            <button type="button" id="githubLoginBtn" class="btn-github">Sign in with GitHub</button>
           </div>
         </div>
-        <div class="grid">
-          <div><label>PORT</label><input id="port" placeholder="3000" value="3000" /></div>
-          <div><label>GitHub OAuth Client ID</label><input id="githubClientId" /></div>
-          <div><label>GitHub OAuth Client Secret</label><input id="githubClientSecret" type="password" /></div>
-          <div><label>DB Host</label><input id="dbHost" placeholder="localhost" value="localhost" /></div>
-          <div><label>DB Port</label><input id="dbPort" placeholder="5432" value="5432" /></div>
-          <div><label>DB User</label><input id="dbUser" placeholder="developer" value="developer" /></div>
-          <div><label>DB Password</label><input id="dbPassword" type="password" /></div>
-          <div><label>DB Name</label><input id="dbName" placeholder="developer" value="personal_developer_branding" /></div>
+        <div id="registerPanel" class="hidden">
+          <h2>Create account</h2>
+          <p class="muted auth-intro">Register to start your developer profile. You will be signed in automatically.</p>
+          <div class="row auth-field">
+            <label for="registerFirstName">First name</label>
+            <input id="registerFirstName" type="text" name="first_name" autocomplete="given-name" />
+          </div>
+          <div class="row auth-field">
+            <label for="registerLastName">Last name</label>
+            <input id="registerLastName" type="text" name="last_name" autocomplete="family-name" />
+          </div>
+          <div class="row auth-field">
+            <label for="registerEmail">Email</label>
+            <input id="registerEmail" type="email" autocomplete="email" />
+          </div>
+          <div class="row auth-field">
+            <label for="registerPassword">Password</label>
+            <input id="registerPassword" type="password" autocomplete="new-password" />
+          </div>
+          <div class="row auth-field">
+            <label for="registerPasswordConfirm">Confirm password</label>
+            <input id="registerPasswordConfirm" type="password" autocomplete="new-password" />
+          </div>
+          <div class="row">
+            <button type="button" id="btnRegisterSubmit">Register</button>
+          </div>
+          <div class="row">
+            <a href="#" id="linkShowLogin" class="auth-switch">Already have an account? Sign in</a>
+          </div>
         </div>
-        <div class="row mt-12">
-          <button id="saveSetupBtn">Save Setup</button>
-        </div>
-        <div id="setupMsg" class="muted"></div>
+        <div id="authMsg" class="muted auth-msg" aria-live="polite"></div>
       </div>
 
       <div class="card hidden" id="syncCard">

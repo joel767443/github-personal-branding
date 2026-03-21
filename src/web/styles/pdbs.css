@@ -127,7 +127,6 @@ button {
   margin-right: 8px;
 }
 button[disabled] { opacity: 0.5; cursor: not-allowed; }
-#loginCard { max-width: 400px; }
 .muted {
   font-family: var(--pdbs-font-sans);
   color: var(--pdbs-color-muted);
@@ -354,10 +353,77 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   border-top: 1px solid #273056;
 }
 
-/* Center login view */
-#loginCard { max-width: 400px; width: 100%; align-self: center; text-align: center; margin-top: auto; margin-bottom: auto; }
-#loginCard .row { display: flex; flex-direction: column; align-items: center; }
-#loginCard button { margin-right: 0; }
+/* Center login / register view */
+#loginCard {
+  max-width: 440px;
+  width: 100%;
+  align-self: center;
+  text-align: center;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+#loginCard .row {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+#loginCard button {
+  margin-right: 0;
+}
+#loginCard .auth-field {
+  align-items: stretch;
+  text-align: left;
+  width: 100%;
+  max-width: 320px;
+}
+#loginCard .auth-field label {
+  align-self: flex-start;
+  margin-bottom: 4px;
+  font-size: var(--pdbs-fs-caption);
+  color: var(--pdbs-color-muted);
+}
+#loginCard .auth-field input {
+  width: 100%;
+  box-sizing: border-box;
+}
+#loginCard .auth-intro {
+  max-width: 400px;
+  margin: 0 auto 12px;
+  text-align: left;
+}
+#loginCard .auth-hint {
+  max-width: 400px;
+  margin: 0 auto 16px;
+  padding: 10px 12px;
+  text-align: left;
+  border: 1px solid #5c4a2a;
+  border-radius: 8px;
+  background: rgba(92, 74, 42, 0.2);
+}
+#loginCard .auth-msg {
+  margin-top: 12px;
+  min-height: 1.25em;
+}
+#loginCard .auth-switch {
+  font-family: var(--pdbs-font-sans);
+  font-size: var(--pdbs-fs-small);
+  color: #7b9cff;
+  text-decoration: none;
+}
+#loginCard .auth-switch:hover {
+  text-decoration: underline;
+}
+#loginCard .auth-divider {
+  margin: 4px 0;
+  font-size: var(--pdbs-fs-caption);
+}
+#loginCard .btn-github {
+  background: #24292f;
+  color: #f0f6fc;
+}
+#loginCard .btn-github:hover {
+  filter: brightness(1.08);
+}
 
 .dataTable {
   width: 100%;

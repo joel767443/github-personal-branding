@@ -43,13 +43,10 @@ const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const userMenuButton = document.getElementById("userMenuButton");
 const userMenuDropdown = document.getElementById("userMenuDropdown");
-const setupCard = document.getElementById("setupCard");
 const syncCard = document.getElementById("syncCard");
-const setupMsg = document.getElementById("setupMsg");
 const syncState = document.getElementById("syncState");
 const progressLog = document.getElementById("progressLog");
 const startSyncBtn = document.getElementById("startSyncBtn");
-const saveSetupBtn = document.getElementById("saveSetupBtn");
 const pageTitle = document.getElementById("pageTitle");
 const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
@@ -72,8 +69,22 @@ const githubOauthCallbackUrlInput = document.getElementById("githubOauthCallback
 const githubOauthClientSecretInput = document.getElementById("githubOauthClientSecretInput");
 const clearGithubOauthClientSecret = document.getElementById("clearGithubOauthClientSecret");
 const loginCard = document.getElementById("loginCard");
-const loginPageBtn = document.getElementById("loginPageBtn");
-const loginMsg = document.getElementById("loginMsg");
+const loginPanel = document.getElementById("loginPanel");
+const registerPanel = document.getElementById("registerPanel");
+const serverConfigHint = document.getElementById("serverConfigHint");
+const authMsg = document.getElementById("authMsg");
+const loginEmail = document.getElementById("loginEmail");
+const loginPassword = document.getElementById("loginPassword");
+const btnLoginSubmit = document.getElementById("btnLoginSubmit");
+const registerFirstName = document.getElementById("registerFirstName");
+const registerLastName = document.getElementById("registerLastName");
+const registerEmail = document.getElementById("registerEmail");
+const registerPassword = document.getElementById("registerPassword");
+const registerPasswordConfirm = document.getElementById("registerPasswordConfirm");
+const btnRegisterSubmit = document.getElementById("btnRegisterSubmit");
+const linkShowRegister = document.getElementById("linkShowRegister");
+const linkShowLogin = document.getElementById("linkShowLogin");
+const githubLoginBtn = document.getElementById("githubLoginBtn");
 const profileAvatar = document.getElementById("profileAvatar");
 const profileLogin = document.getElementById("profileLogin");
 const profileName = document.getElementById("profileName");
@@ -935,25 +946,31 @@ async function refreshStatus() {
     setHidden(dataPageCard, !showDataPageCard);
 
     pageTitle.textContent = capitalizePageTitle(
-      showSetup
-        ? "Initial Setup"
+      showSetup || showLogin
+        ? "Sign in"
         : postSetupAwaitingAuth
           ? "Sync GitHub Data"
-          : showLogin
-            ? "Sign in"
-            : route
+          : route
               ? (route.title || "Data")
               : forceUploadUi
                 ? "LinkedIn Upload"
                 : "PDBS",
     );
 
-    setHidden(setupCard, !showSetup);
+    const showAuthCard = (showSetup || showLogin) && !postSetupAwaitingAuth;
+    setHidden(loginCard, !showAuthCard);
+    if (serverConfigHint) {
+      if (showSetup && (status.missing?.length ?? 0) > 0) {
+        serverConfigHint.textContent = `Server configuration incomplete: ${status.missing.join(", ")}. Set these in your environment or .env file (for example DATABASE_URL and SESSION_SECRET).`;
+        setHidden(serverConfigHint, false);
+      } else {
+        setHidden(serverConfigHint, true);
+      }
+    }
     // Match dashboard: Step 2 / sync UX only on `/dashboard`, not on Profile or other data routes.
     const showSyncCard =
       postSetupAwaitingAuth || (showSync && !forceUploadUi && isDashboardRoute);
     setHidden(syncCard, !showSyncCard);
-    setHidden(loginCard, !(showLogin && !postSetupAwaitingAuth));
     // Only show LinkedIn upload UI on the dedicated upload route,
     // or on the Profile page when GitHub sync is complete (allows re-upload).
     const showUploadCard =
@@ -1002,9 +1019,10 @@ async function refreshStatus() {
       loadDataPage().catch((err) => console.error("loadDataPage failed:", err));
     }
 
-    if (showSetup) {
-      setupMsg.textContent = `Missing config: ${status.missing.join(", ")}`;
-      syncState.textContent = "Blocked until setup is complete";
+    if (showSetup || showLogin) {
+      syncState.textContent = showSetup
+        ? "Blocked until server configuration is complete and you are signed in"
+        : "Sign in to start sync";
       startSyncBtn.disabled = true;
       if (progressSSE) {
         progressSSE.close();
@@ -1013,10 +1031,6 @@ async function refreshStatus() {
     } else if (postSetupAwaitingAuth) {
       syncState.textContent = "Sign in with GitHub to run your first sync.";
       startSyncBtn.disabled = false;
-    } else if (showLogin) {
-      if (loginMsg) loginMsg.textContent = "Login required. Click the button below.";
-      syncState.textContent = "Login required to start sync";
-      startSyncBtn.disabled = true;
     } else if (!status.authenticated) {
       syncState.textContent = "Login required to start sync";
       startSyncBtn.disabled = true;
@@ -1057,43 +1071,6 @@ async function refreshStatus() {
     syncSidebarActiveFromPath();
   } catch (err) {
     syncState.textContent = `Status failed: ${err.message}`;
-  }
-}
-
-async function submitSetup() {
-  try {
-    saveSetupBtn.disabled = true;
-    setupMsg.textContent = "Saving setup...";
-    const payload = {
-      port: document.getElementById("port").value,
-      githubClientId: document.getElementById("githubClientId").value,
-      githubClientSecret: document.getElementById("githubClientSecret").value,
-      dbHost: document.getElementById("dbHost").value,
-      dbPort: document.getElementById("dbPort").value,
-      dbUser: document.getElementById("dbUser").value,
-      dbPassword: document.getElementById("dbPassword").value,
-      dbName: document.getElementById("dbName").value,
-    };
-    const out = await getJson("/setup/submit", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    setupMsg.textContent = out.message || "Saved.";
-    if (out.nextAuthUrl) {
-      sessionStorage.setItem(POST_SETUP_AWAIT_GITHUB_KEY, "1");
-      addLog("Setup saved. Continue with Step 2, then sign in with GitHub.", "ok");
-      await refreshStatus();
-      return;
-    }
-    if (out.restartRequired) {
-      addLog("Setup saved. Restart server to apply values.", "ok");
-    }
-    await refreshStatus();
-  } catch (err) {
-    setupMsg.textContent = err.message;
-  } finally {
-    saveSetupBtn.disabled = false;
   }
 }
 
@@ -1215,10 +1192,6 @@ loginBtn.addEventListener("click", () => {
   window.location.href = "/auth/github";
 });
 
-loginPageBtn?.addEventListener("click", () => {
-  window.location.href = "/auth/github";
-});
-
 userMenuButton.addEventListener("click", () => {
   userMenuDropdown.classList.toggle("open");
 });
@@ -1233,7 +1206,109 @@ document.addEventListener("click", (ev) => {
   }
 });
 
-saveSetupBtn.addEventListener("click", submitSetup);
+function showLoginPanel() {
+  if (loginPanel) setHidden(loginPanel, false);
+  if (registerPanel) setHidden(registerPanel, true);
+}
+
+function showRegisterPanel() {
+  if (loginPanel) setHidden(loginPanel, true);
+  if (registerPanel) setHidden(registerPanel, false);
+}
+
+linkShowRegister?.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (authMsg) authMsg.textContent = "";
+  showRegisterPanel();
+});
+
+linkShowLogin?.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (authMsg) authMsg.textContent = "";
+  showLoginPanel();
+});
+
+async function submitEmailLogin() {
+  if (authMsg) authMsg.textContent = "";
+  const email = String(loginEmail?.value ?? "").trim();
+  const password = loginPassword?.value ?? "";
+  if (!email || !password) {
+    if (authMsg) authMsg.textContent = "Enter email and password.";
+    return;
+  }
+  try {
+    if (btnLoginSubmit) btnLoginSubmit.disabled = true;
+    await getJson("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const u = new URL(window.location.href);
+    if (u.pathname === "/" || u.pathname === "") {
+      u.pathname = "/dashboard";
+      window.history.replaceState(null, "", u.toString());
+    }
+    await refreshStatus();
+  } catch (err) {
+    if (authMsg) authMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnLoginSubmit) btnLoginSubmit.disabled = false;
+  }
+}
+
+async function submitEmailRegister() {
+  if (authMsg) authMsg.textContent = "";
+  const firstName = String(registerFirstName?.value ?? "").trim();
+  const lastName = String(registerLastName?.value ?? "").trim();
+  const email = String(registerEmail?.value ?? "").trim();
+  const password = registerPassword?.value ?? "";
+  const confirm = registerPasswordConfirm?.value ?? "";
+  if (!firstName || !lastName) {
+    if (authMsg) authMsg.textContent = "Enter first name and last name.";
+    return;
+  }
+  if (!email || !password) {
+    if (authMsg) authMsg.textContent = "Enter email and password.";
+    return;
+  }
+  if (password !== confirm) {
+    if (authMsg) authMsg.textContent = "Passwords do not match.";
+    return;
+  }
+  try {
+    if (btnRegisterSubmit) btnRegisterSubmit.disabled = true;
+    await getJson("/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, firstName, lastName }),
+    });
+    const u = new URL(window.location.href);
+    if (u.pathname === "/" || u.pathname === "") {
+      u.pathname = "/dashboard";
+      window.history.replaceState(null, "", u.toString());
+    }
+    await refreshStatus();
+  } catch (err) {
+    if (authMsg) authMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnRegisterSubmit) btnRegisterSubmit.disabled = false;
+  }
+}
+
+btnLoginSubmit?.addEventListener("click", () => submitEmailLogin());
+btnRegisterSubmit?.addEventListener("click", () => submitEmailRegister());
+
+loginPassword?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitEmailLogin();
+});
+registerPasswordConfirm?.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitEmailRegister();
+});
+
+githubLoginBtn?.addEventListener("click", () => {
+  window.location.href = "/auth/github";
+});
+
 startSyncBtn.addEventListener("click", () => {
   const pending =
     sessionStorage.getItem(POST_SETUP_AWAIT_GITHUB_KEY) === "1" &&

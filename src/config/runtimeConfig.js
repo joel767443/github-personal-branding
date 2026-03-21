@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const ENV_PATH = path.join(__dirname, "..", "..", ".env");
 const EXAMPLE_ENV_PATH = path.join(__dirname, "..", "..", ".example.env");
@@ -85,6 +86,14 @@ function ensureEnvFromExample() {
   return true;
 }
 
+/** If SESSION_SECRET is unset, generate one and persist to `.env` so cookies and `/setup/status` stay consistent. */
+function ensureSessionSecret() {
+  if (String(process.env.SESSION_SECRET ?? "").trim()) return;
+  const secret = crypto.randomBytes(32).toString("hex");
+  writeEnvWithUpdates({ SESSION_SECRET: secret });
+  process.env.SESSION_SECRET = secret;
+}
+
 module.exports = {
   ENV_PATH,
   EXAMPLE_ENV_PATH,
@@ -93,5 +102,6 @@ module.exports = {
   missingConfigKeys,
   readCurrentEnv,
   ensureEnvFromExample,
+  ensureSessionSecret,
 };
 
