@@ -160,27 +160,6 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 }
 .hidden { display: none !important; }
 
-/* Full-viewport gate when per-developer tokens (GITHUB_TOKEN, ACCESS_TOKEN, PERSON_ID) are unset */
-.credentialsGate {
-  position: fixed;
-  inset: 0;
-  z-index: 10050;
-  background: rgba(6, 8, 18, 0.88);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  box-sizing: border-box;
-}
-.credentialsGate .credentialsGateCard {
-  max-width: 520px;
-  width: 100%;
-  margin: 0;
-}
-.credentialsGate code {
-  font-size: 0.9em;
-  color: #8ea4ff;
-}
 .headerRow { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .mt-12 { margin-top: 12px; }
 .ml-auto { margin-left: auto; }

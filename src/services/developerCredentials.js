@@ -1,10 +1,14 @@
 const prisma = require('../db/prisma');
-const { decryptField } = require('../crypto/fieldEncryption');
 const { createGithubClient } = require('./githubService');
+const { readCurrentEnv } = require('../config/runtimeConfig');
+
+function mergedEnv() {
+  return { ...process.env, ...readCurrentEnv() };
+}
 
 /**
- * Resolve GitHub API token and username for a developer (encrypted fields on `developers` only).
- * Do not use global GITHUB_TOKEN / GITHUB_USERNAME — multi-tenant installs store credentials per row.
+ * GitHub API access uses `GITHUB_TOKEN` from the server environment (`.env` / process env).
+ * The developer row supplies `githubUsername` / `githubLogin` for which GitHub user to sync.
  * @param {number} developerId
  * @returns {Promise<{ token: string, username: string | null } | null>}
  */
@@ -12,10 +16,12 @@ async function getGithubCredentialsForDeveloper(developerId) {
   if (developerId == null || Number.isNaN(Number(developerId))) {
     return null;
   }
+  const token = String(mergedEnv().GITHUB_TOKEN ?? '').trim();
+  if (!token) return null;
+
   const dev = await prisma.developer.findUnique({
-    where: { id: developerId },
+    where: { id: Number(developerId) },
     select: {
-      githubAccessTokenEnc: true,
       githubUsername: true,
       githubLogin: true,
       email: true,
@@ -23,20 +29,11 @@ async function getGithubCredentialsForDeveloper(developerId) {
   });
   if (!dev) return null;
 
-  if (!dev.githubAccessTokenEnc) {
-    return null;
-  }
-  try {
-    const token = decryptField(dev.githubAccessTokenEnc);
-    if (!token) return null;
-    const username =
-      (dev.githubUsername && String(dev.githubUsername).trim()) ||
-      (dev.githubLogin && String(dev.githubLogin).trim()) ||
-      null;
-    return { token, username };
-  } catch {
-    return null;
-  }
+  const username =
+    (dev.githubUsername && String(dev.githubUsername).trim()) ||
+    (dev.githubLogin && String(dev.githubLogin).trim()) ||
+    null;
+  return { token, username };
 }
 
 /**
@@ -49,27 +46,7 @@ async function getGithubClientForDeveloper(developerId) {
   return createGithubClient(creds.token);
 }
 
-/**
- * @param {number} developerId
- * @param {string} accessToken
- * @param {string | null | undefined} [refreshToken]
- */
-async function saveGithubTokensForDeveloper(developerId, accessToken, refreshToken = null) {
-  const { encryptField } = require('../crypto/fieldEncryption');
-  const data = {
-    githubAccessTokenEnc: encryptField(accessToken),
-  };
-  if (refreshToken) {
-    data.githubRefreshTokenEnc = encryptField(refreshToken);
-  }
-  await prisma.developer.update({
-    where: { id: developerId },
-    data,
-  });
-}
-
 module.exports = {
   getGithubCredentialsForDeveloper,
   getGithubClientForDeveloper,
-  saveGithubTokensForDeveloper,
 };

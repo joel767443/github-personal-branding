@@ -104,10 +104,6 @@ const dataPageSubtitle = document.getElementById("dataPageSubtitle");
 const dataPageContent = document.getElementById("dataPageContent");
 const POST_SETUP_AWAIT_GITHUB_KEY = "pdbs_await_github_after_setup";
 
-const developerCredentialsGate = document.getElementById("developerCredentialsGate");
-const credGithubToken = document.getElementById("credGithubToken");
-const btnSaveCredentials = document.getElementById("btnSaveCredentials");
-const credentialsMsg = document.getElementById("credentialsMsg");
 const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
 const linkedinCredAccessToken = document.getElementById("linkedinCredAccessToken");
 const linkedinCredPersonId = document.getElementById("linkedinCredPersonId");
@@ -894,17 +890,6 @@ async function refreshStatus() {
     const showSync = status.wizardStep === "sync";
     const showUploadStep = status.wizardStep === "upload";
 
-    const credGate =
-      Boolean(status.needsDeveloperCredentials) &&
-      status.authenticated &&
-      !showSetup &&
-      !showLogin &&
-      !postSetupAwaitingAuth;
-    setHidden(developerCredentialsGate, !credGate);
-    if (!credGate && credentialsMsg) {
-      credentialsMsg.textContent = "";
-    }
-
     if (
       (window.location.pathname || "/") === "/" &&
       status.authenticated &&
@@ -1036,7 +1021,7 @@ async function refreshStatus() {
       syncState.textContent = "Login required to start sync";
       startSyncBtn.disabled = true;
     } else if (status.needsDeveloperCredentials) {
-      syncState.textContent = "Add your GitHub token to start sync";
+      syncState.textContent = "Set GITHUB_TOKEN in the server environment to start sync";
       startSyncBtn.disabled = true;
     } else if (status.syncInProgress) {
       syncState.textContent = "Sync running...";
@@ -1231,32 +1216,6 @@ startSyncBtn.addEventListener("click", () => {
   startSync();
 });
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
-
-async function submitDeveloperCredentials() {
-  const v = credGithubToken?.value?.trim();
-  if (!v) {
-    if (credentialsMsg) credentialsMsg.textContent = "Enter your GitHub personal access token.";
-    return;
-  }
-  if (credentialsMsg) credentialsMsg.textContent = "Saving…";
-  if (btnSaveCredentials) btnSaveCredentials.disabled = true;
-  try {
-    await getJson("/api/settings/developer", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ githubToken: v }),
-    });
-    if (credentialsMsg) credentialsMsg.textContent = "Saved.";
-    if (credGithubToken) credGithubToken.value = "";
-    await refreshStatus();
-  } catch (err) {
-    if (credentialsMsg) credentialsMsg.textContent = err.message || String(err);
-  } finally {
-    if (btnSaveCredentials) btnSaveCredentials.disabled = false;
-  }
-}
-
-btnSaveCredentials?.addEventListener("click", () => submitDeveloperCredentials());
 
 async function submitLinkedinCredentials() {
   const at = linkedinCredAccessToken?.value?.trim();

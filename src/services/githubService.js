@@ -20,7 +20,7 @@ function createGithubClient(token) {
   });
 }
 
-/** @deprecated Prefer passing an explicit client from getGithubCredentialsForDeveloper */
+/** Unauthenticated or env-token client; prefer `createGithubClient` with a token from `getGithubCredentialsForDeveloper`. */
 function getEnvGithubClient() {
   const token = String(process.env.GITHUB_TOKEN ?? '').trim();
   if (!token) {

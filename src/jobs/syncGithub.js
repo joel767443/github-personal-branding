@@ -12,7 +12,7 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
   const creds = await getGithubCredentialsForDeveloper(developerId);
   if (!creds?.token) {
     throw new Error(
-      'GitHub is not connected for this account. Sign in with GitHub OAuth so your token is stored securely.',
+      'GitHub API token is not configured. Set GITHUB_TOKEN in the server environment (e.g. `.env`) to a personal access token with access to the repositories you want to sync.',
     );
   }
 

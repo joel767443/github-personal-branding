@@ -36,7 +36,6 @@ const { executeLinkedinImportPipeline } = require('./jobs/linkedinPipeline');
 const { resolveDeveloperFromSession } = require('./services/sessionDeveloperService');
 const { getDashboardAnalytics } = require('./services/dashboardAnalyticsService');
 const prisma = require('./db/prisma');
-const { saveGithubTokensForDeveloper } = require('./services/developerCredentials');
 const {
   resolveGithubOAuthAppCredentials,
   isGithubOAuthConfigured,
@@ -618,9 +617,6 @@ app.get('/auth/github/callback', async (req, res) => {
       });
     }
 
-    const refreshToken = tokenJson.refresh_token ?? null;
-    await saveGithubTokensForDeveloper(developer.id, accessToken, refreshToken);
-
     await prisma.developer.update({
       where: { id: developer.id },
       data: {
@@ -726,12 +722,6 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
           },
           update: { enabled: Boolean(enabled) },
         });
-      }
-    }
-    if (body.githubToken !== undefined) {
-      const t = String(body.githubToken ?? '').trim();
-      if (t) {
-        await saveGithubTokensForDeveloper(developer.id, t);
       }
     }
     if (body.accessToken !== undefined) {
@@ -854,17 +844,16 @@ app.get('/setup/status', async (req, res) => {
         const row = await prisma.developer.findUnique({
           where: { id: resolved.developer.id },
           select: {
-            githubAccessTokenEnc: true,
             linkedinAccessTokenEnc: true,
             linkedinPersonId: true,
           },
         });
+        const githubFromEnv = Boolean(String(envSnapshot.GITHUB_TOKEN ?? '').trim());
         credentialFlags = {
-          hasGithubToken: Boolean(row?.githubAccessTokenEnc),
+          hasGithubToken: githubFromEnv,
           hasAccessToken: Boolean(row?.linkedinAccessTokenEnc),
           hasPersonId: Boolean(row?.linkedinPersonId && String(row.linkedinPersonId).trim()),
         };
-        // GitHub token: required after registration before sync (OAuth may have stored it already).
         needsDeveloperCredentials = !credentialFlags.hasGithubToken;
         needsLinkedInCredentials =
           credentialFlags.hasGithubToken &&

@@ -4,7 +4,7 @@ A Node.js app that syncs **GitHub** activity into **PostgreSQL**, enriches it wi
 
 ## Features
 
-- **GitHub OAuth** login and **PAT-based** API sync (repos, languages, commits metadata)
+- **GitHub OAuth** login and **server `GITHUB_TOKEN`** API sync (repos, languages, commits metadata)
 - **Developer profile** storage with Prisma ORM (PostgreSQL)
 - **Tech stack** and **architecture** detection from repo contents
 - **LinkedIn** data import from an official export ZIP
@@ -15,7 +15,7 @@ A Node.js app that syncs **GitHub** activity into **PostgreSQL**, enriches it wi
 
 - **Node.js** 18+ (recommended)
 - **PostgreSQL** reachable via `DATABASE_URL`
-- A **GitHub OAuth App** (Client ID + secret) and a **personal access token** for API calls
+- A **GitHub OAuth App** (Client ID + secret) for login and **`GITHUB_TOKEN`** (PAT) in the server environment for sync jobs
 - **Git** (for portfolio deploy)
 
 ## Setup
@@ -50,12 +50,13 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 |----------|---------|
 | `PORT` | HTTP port (default `3000`) |
 | `DATABASE_URL` | PostgreSQL connection string |
+| `GITHUB_TOKEN` | Personal access token for GitHub API (sync jobs); server-wide, not per user |
 
 **`SESSION_SECRET`:** one secret for the entire server (Express signs all users’ cookies with it). It is **not** per developer. Set it in the process environment, secret manager, or via Initial Setup — not as one row per user in the database.
 
 **GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
 
-Per-developer data is stored on `developers` (see Prisma model comments): GitHub tokens (`githubAccessTokenEnc`, `githubRefreshTokenEnc`), `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and deploy toggle (`deployPortfolioAfterSync`). Portfolio repo URL is configured via `DEPLOY_REPO_URL` in the server environment when deploy runs.
+Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and deploy toggle (`deployPortfolioAfterSync`). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Portfolio repo URL is configured via `DEPLOY_REPO_URL` in the server environment when deploy runs.
 
 **Portfolio deploy CLI** (manual runs only):
 
