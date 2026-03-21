@@ -59,7 +59,7 @@ async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, defaultCa
     (dev.githubOauthCallbackUrl && String(dev.githubOauthCallbackUrl).trim()) || defaultCallback;
   return {
     clientId: String(dev.githubOauthClientId).trim(),
-    clientSecret,
+    clientSecret: String(clientSecret).trim(),
     callbackUrl: cb,
   };
 }
@@ -77,6 +77,19 @@ async function resolveGithubOAuthAppCredentials(req) {
   const envCallback =
     (envSnapshot.GITHUB_OAUTH_CALLBACK_URL && String(envSnapshot.GITHUB_OAUTH_CALLBACK_URL).trim()) ||
     defaultCallback;
+
+  const envClientId = String(envSnapshot.GITHUB_CLIENT_ID ?? '').trim();
+  const envClientSecret = resolveGithubOAuthClientSecretFromEnv(envSnapshot);
+
+  // Server `.env` OAuth app (`GITHUB_CLIENT_ID` + `GITHUB_CLIENT_SECRET`) takes precedence over
+  // per-developer BYO rows so local/staging config is never ignored when a user is logged in.
+  if (envClientId && envClientSecret) {
+    return {
+      clientId: envClientId,
+      clientSecret: String(envClientSecret).trim(),
+      callbackUrl: envCallback,
+    };
+  }
 
   const devId = req.session?.oauthDeveloperId ?? req.session?.user?.developerId ?? null;
   if (devId != null && !Number.isNaN(Number(devId))) {
@@ -100,21 +113,11 @@ async function resolveGithubOAuthAppCredentials(req) {
           (dev.githubOauthCallbackUrl && String(dev.githubOauthCallbackUrl).trim()) || defaultCallback;
         return {
           clientId: String(dev.githubOauthClientId).trim(),
-          clientSecret,
+          clientSecret: String(clientSecret).trim(),
           callbackUrl: cb,
         };
       }
     }
-  }
-
-  const envClientId = String(envSnapshot.GITHUB_CLIENT_ID ?? '').trim();
-  const envClientSecret = resolveGithubOAuthClientSecretFromEnv(envSnapshot);
-  if (envClientId && envClientSecret) {
-    return {
-      clientId: envClientId,
-      clientSecret: envClientSecret,
-      callbackUrl: envCallback,
-    };
   }
 
   if (envClientId && !envClientSecret) {
@@ -124,7 +127,7 @@ async function resolveGithubOAuthAppCredentials(req) {
 
   return {
     clientId: envClientId,
-    clientSecret: envClientSecret,
+    clientSecret: String(envClientSecret).trim(),
     callbackUrl: envCallback,
   };
 }

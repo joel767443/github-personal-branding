@@ -502,6 +502,8 @@ app.get('/auth/github', async (req, res) => {
 
     const state = crypto.randomBytes(16).toString('hex');
     req.session.oauthState = state;
+    // Token exchange must use the same redirect_uri string GitHub saw on authorize (byte-for-byte).
+    req.session.oauthGithubRedirectUri = creds.callbackUrl;
     const url = new URL('https://github.com/login/oauth/authorize');
     url.searchParams.set('client_id', creds.clientId);
     url.searchParams.set('redirect_uri', creds.callbackUrl);
@@ -521,9 +523,12 @@ app.get('/auth/github/callback', async (req, res) => {
     }
 
     const creds = await resolveGithubOAuthAppCredentials(req);
+    console.log("creds", creds);
     if (!creds.clientId || !creds.clientSecret) {
-      return respondError(res, 400, 'Missing config', 'GITHUB OAuth credentials are not configured');
+      return respondError(res, 400, 'Missing config', 'GitHub OAuth client id and client secret are required');
     }
+
+    const redirectUri = req.session.oauthGithubRedirectUri ?? creds.callbackUrl;
 
     const tokenResp = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -535,7 +540,7 @@ app.get('/auth/github/callback', async (req, res) => {
         client_id: creds.clientId,
         client_secret: creds.clientSecret,
         code: String(code),
-        redirect_uri: creds.callbackUrl,
+        redirect_uri: redirectUri,
         state: String(state),
       }),
     });
@@ -546,7 +551,14 @@ app.get('/auth/github/callback', async (req, res) => {
         return respondError(res, 400, 'OAuth token exchange failed', {
           ...tokenJson,
           hint:
-            'GITHUB_CLIENT_ID must match your OAuth App. Set GITHUB_CLIENT_SECRET to that app’s Client secrets value (GitHub → Settings → Developer settings → OAuth Apps). A personal access token (ghp_...) cannot be used as the OAuth client secret.',
+            'Use the OAuth App Client ID and Client secret from GitHub → Settings → Developer settings → OAuth Apps (not a GitHub App’s credentials). They must be from the same app. Regenerate the client secret if unsure. A personal access token (ghp_...) cannot be used as the client secret.',
+        });
+      }
+      if (tokenJson.error === 'redirect_uri_mismatch') {
+        return respondError(res, 400, 'OAuth token exchange failed', {
+          ...tokenJson,
+          hint:
+            'The redirect URL sent to GitHub must match your OAuth App’s Authorization callback URL and stay identical between /auth/github and the token request. Set GITHUB_OAUTH_CALLBACK_URL to that exact URL if you use a custom host or proxy.',
         });
       }
       return respondError(res, 400, 'OAuth token exchange failed', tokenJson);
@@ -649,6 +661,7 @@ app.get('/auth/github/callback', async (req, res) => {
       developerId: developer.id,
     };
     delete req.session.oauthState;
+    delete req.session.oauthGithubRedirectUri;
     res.redirect('/dashboard');
   } catch (err) {
     respondError(res, 500, 'OAuth callback failed', err?.message ?? String(err));
