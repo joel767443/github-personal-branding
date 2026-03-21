@@ -499,7 +499,7 @@ app.get('/auth/github', async (req, res) => {
         res,
         400,
         'Missing config',
-        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET for the server, or add your own OAuth app under account settings after signing in with email.',
+        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET for the server, or sign in with email and password, then add your own OAuth app under account settings.',
       );
     }
 
@@ -630,53 +630,6 @@ app.get('/auth/github/callback', async (req, res) => {
   }
 });
 
-app.post('/auth/register', async (req, res) => {
-  try {
-    const rawEmail = String(req.body?.email ?? '').trim();
-    const password = req.body?.password;
-    const firstName = String(req.body?.firstName ?? '').trim();
-    const lastName = String(req.body?.lastName ?? '').trim();
-    if (!rawEmail || !password) {
-      return respondError(res, 400, 'Invalid input', 'email and password required');
-    }
-    if (!firstName || !lastName) {
-      return respondError(res, 400, 'Invalid input', 'first name and last name required');
-    }
-    const existing = await prisma.user.findUnique({ where: { email: rawEmail } });
-    if (existing) return respondError(res, 409, 'Exists', 'Email already registered');
-    const passwordHash = await bcrypt.hash(String(password), 12);
-    const user = await prisma.user.create({
-      data: { email: rawEmail, passwordHash },
-    });
-    const dev = await prisma.developer.create({
-      data: {
-        email: rawEmail,
-        userId: user.id,
-        firstName,
-        lastName,
-        subscriptionStatus: 'trialing',
-      },
-    });
-    await prisma.developerSocialIntegration.createMany({
-      data: ['FACEBOOK', 'TWITTER', 'LINKEDIN'].map((platform) => ({
-        developerId: dev.id,
-        platform,
-        enabled: false,
-      })),
-      skipDuplicates: true,
-    });
-    req.session.user = {
-      login: rawEmail,
-      email: rawEmail,
-      developerId: dev.id,
-      name: `${firstName} ${lastName}`.trim(),
-    };
-    res.json({ ok: true, developerId: dev.id });
-  } catch (err) {
-    respondError(res, 500, 'Registration failed', err?.message ?? String(err));
-  }
-});
-
 app.post('/auth/login', async (req, res) => {
   try {
     const rawEmail = String(req.body?.email ?? '').trim();
@@ -706,7 +659,7 @@ app.get('/api/settings/developer', requireLogin, async (req, res) => {
   try {
     const { developer } = await resolveDeveloperFromSession(req);
     if (!developer) {
-      return respondError(res, 404, 'No developer record', 'Complete GitHub sign-in or registration first');
+      return respondError(res, 404, 'No developer record', 'Sign in with GitHub or email to create a developer profile first');
     }
     const full = await prisma.developer.findUnique({
       where: { id: developer.id },
@@ -722,7 +675,7 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
   try {
     const { developer } = await resolveDeveloperFromSession(req);
     if (!developer) {
-      return respondError(res, 404, 'No developer record', 'Complete GitHub sign-in or registration first');
+      return respondError(res, 404, 'No developer record', 'Sign in with GitHub or email to create a developer profile first');
     }
     const body = req.body ?? {};
     const data = {};
@@ -773,6 +726,22 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
           update: { enabled: Boolean(enabled) },
         });
       }
+    }
+    if (body.githubToken !== undefined) {
+      const t = String(body.githubToken ?? '').trim();
+      if (t) {
+        await saveGithubTokensForDeveloper(developer.id, t);
+      }
+    }
+    if (body.accessToken !== undefined) {
+      const t = String(body.accessToken ?? '').trim();
+      if (t) {
+        data.linkedinAccessTokenEnc = encryptField(t);
+      }
+    }
+    if (body.personId !== undefined) {
+      const p = String(body.personId ?? '').trim();
+      data.linkedinPersonId = p || null;
     }
     if (Object.keys(data).length) {
       await prisma.developer.update({ where: { id: developer.id }, data });
@@ -869,6 +838,40 @@ app.get('/setup/status', async (req, res) => {
   } catch {
     // If DB inspection fails, fall back to the session-derived wizardStep.
   }
+
+  let credentialFlags = {
+    hasGithubToken: false,
+    hasAccessToken: false,
+    hasPersonId: false,
+  };
+  let needsDeveloperCredentials = false;
+  try {
+    if (missing.length === 0 && req.session?.user) {
+      const resolved = await resolveDeveloperFromSession(req);
+      if (resolved.developer) {
+        const row = await prisma.developer.findUnique({
+          where: { id: resolved.developer.id },
+          select: {
+            githubAccessTokenEnc: true,
+            linkedinAccessTokenEnc: true,
+            linkedinPersonId: true,
+          },
+        });
+        credentialFlags = {
+          hasGithubToken: Boolean(row?.githubAccessTokenEnc),
+          hasAccessToken: Boolean(row?.linkedinAccessTokenEnc),
+          hasPersonId: Boolean(row?.linkedinPersonId && String(row.linkedinPersonId).trim()),
+        };
+        needsDeveloperCredentials =
+          !credentialFlags.hasGithubToken ||
+          !credentialFlags.hasAccessToken ||
+          !credentialFlags.hasPersonId;
+      }
+    }
+  } catch {
+    needsDeveloperCredentials = false;
+  }
+
   res.json({
     authenticated: Boolean(req.session?.user),
     user: req.session?.user ?? null,
@@ -880,6 +883,8 @@ app.get('/setup/status', async (req, res) => {
     envBootstrapped: !envExistsBefore && envExistsNow,
     missing,
     needsSetup: missing.length > 0,
+    credentialFlags,
+    needsDeveloperCredentials,
     syncInProgress,
     linkedinImportInProgress,
     runId: activeRunId,

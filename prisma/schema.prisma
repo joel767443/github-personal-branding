@@ -40,6 +40,8 @@ model User {
 /// Per-developer profile and integration settings (replaces per-user values that used to live in `.env`).
 /// Former env → column mapping (multi-tenant):
 /// - GITHUB_TOKEN → github_access_token_enc (encrypted); refresh → github_refresh_token_enc
+/// - ACCESS_TOKEN (LinkedIn) → linkedin_access_token_enc (encrypted)
+/// - PERSON_ID (LinkedIn member / person id) → linkedin_person_id
 /// - GITHUB_USERNAME / login → github_username, github_login
 /// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
 /// - GITHUB_OAUTH_CALLBACK_URL (optional override for BYO) → github_oauth_callback_url
@@ -70,6 +72,11 @@ model Developer {
   githubUsername String? @map("github_username")
   githubAccessTokenEnc  String? @map("github_access_token_enc") @db.Text
   githubRefreshTokenEnc String? @map("github_refresh_token_enc") @db.Text
+
+  /// LinkedIn API OAuth access token (legacy env name ACCESS_TOKEN).
+  linkedinAccessTokenEnc String? @map("linkedin_access_token_enc") @db.Text
+  /// LinkedIn person / member id (legacy env name PERSON_ID).
+  linkedinPersonId       String? @map("linkedin_person_id")
 
   /// Optional “bring your own” GitHub OAuth app (when not using server GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET).
   githubOauthClientId          String? @map("github_oauth_client_id")

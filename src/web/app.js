@@ -69,21 +69,11 @@ const githubOauthCallbackUrlInput = document.getElementById("githubOauthCallback
 const githubOauthClientSecretInput = document.getElementById("githubOauthClientSecretInput");
 const clearGithubOauthClientSecret = document.getElementById("clearGithubOauthClientSecret");
 const loginCard = document.getElementById("loginCard");
-const loginPanel = document.getElementById("loginPanel");
-const registerPanel = document.getElementById("registerPanel");
 const serverConfigHint = document.getElementById("serverConfigHint");
 const authMsg = document.getElementById("authMsg");
 const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
 const btnLoginSubmit = document.getElementById("btnLoginSubmit");
-const registerFirstName = document.getElementById("registerFirstName");
-const registerLastName = document.getElementById("registerLastName");
-const registerEmail = document.getElementById("registerEmail");
-const registerPassword = document.getElementById("registerPassword");
-const registerPasswordConfirm = document.getElementById("registerPasswordConfirm");
-const btnRegisterSubmit = document.getElementById("btnRegisterSubmit");
-const linkShowRegister = document.getElementById("linkShowRegister");
-const linkShowLogin = document.getElementById("linkShowLogin");
 const githubLoginBtn = document.getElementById("githubLoginBtn");
 const profileAvatar = document.getElementById("profileAvatar");
 const profileLogin = document.getElementById("profileLogin");
@@ -124,6 +114,16 @@ const dataPageTitle = document.getElementById("dataPageTitle");
 const dataPageSubtitle = document.getElementById("dataPageSubtitle");
 const dataPageContent = document.getElementById("dataPageContent");
 const POST_SETUP_AWAIT_GITHUB_KEY = "pdbs_await_github_after_setup";
+
+const developerCredentialsGate = document.getElementById("developerCredentialsGate");
+const credGithubTokenRow = document.getElementById("credGithubTokenRow");
+const credAccessTokenRow = document.getElementById("credAccessTokenRow");
+const credPersonIdRow = document.getElementById("credPersonIdRow");
+const credGithubToken = document.getElementById("credGithubToken");
+const credAccessToken = document.getElementById("credAccessToken");
+const credPersonId = document.getElementById("credPersonId");
+const btnSaveCredentials = document.getElementById("btnSaveCredentials");
+const credentialsMsg = document.getElementById("credentialsMsg");
 
 let statusCache = null;
 let progressSSE = null;
@@ -912,6 +912,22 @@ async function refreshStatus() {
     const showSync = status.wizardStep === "sync";
     const showUploadStep = status.wizardStep === "upload";
 
+    const credGate =
+      Boolean(status.needsDeveloperCredentials) &&
+      status.authenticated &&
+      !showSetup &&
+      !showLogin &&
+      !postSetupAwaitingAuth;
+    setHidden(developerCredentialsGate, !credGate);
+    if (credGate && status.credentialFlags) {
+      const cf = status.credentialFlags;
+      if (credGithubTokenRow) setHidden(credGithubTokenRow, Boolean(cf.hasGithubToken));
+      if (credAccessTokenRow) setHidden(credAccessTokenRow, Boolean(cf.hasAccessToken));
+      if (credPersonIdRow) setHidden(credPersonIdRow, Boolean(cf.hasPersonId));
+    } else if (!credGate && credentialsMsg) {
+      credentialsMsg.textContent = "";
+    }
+
     if (
       (window.location.pathname || "/") === "/" &&
       status.authenticated &&
@@ -1206,28 +1222,6 @@ document.addEventListener("click", (ev) => {
   }
 });
 
-function showLoginPanel() {
-  if (loginPanel) setHidden(loginPanel, false);
-  if (registerPanel) setHidden(registerPanel, true);
-}
-
-function showRegisterPanel() {
-  if (loginPanel) setHidden(loginPanel, true);
-  if (registerPanel) setHidden(registerPanel, false);
-}
-
-linkShowRegister?.addEventListener("click", (e) => {
-  e.preventDefault();
-  if (authMsg) authMsg.textContent = "";
-  showRegisterPanel();
-});
-
-linkShowLogin?.addEventListener("click", (e) => {
-  e.preventDefault();
-  if (authMsg) authMsg.textContent = "";
-  showLoginPanel();
-});
-
 async function submitEmailLogin() {
   if (authMsg) authMsg.textContent = "";
   const email = String(loginEmail?.value ?? "").trim();
@@ -1256,53 +1250,10 @@ async function submitEmailLogin() {
   }
 }
 
-async function submitEmailRegister() {
-  if (authMsg) authMsg.textContent = "";
-  const firstName = String(registerFirstName?.value ?? "").trim();
-  const lastName = String(registerLastName?.value ?? "").trim();
-  const email = String(registerEmail?.value ?? "").trim();
-  const password = registerPassword?.value ?? "";
-  const confirm = registerPasswordConfirm?.value ?? "";
-  if (!firstName || !lastName) {
-    if (authMsg) authMsg.textContent = "Enter first name and last name.";
-    return;
-  }
-  if (!email || !password) {
-    if (authMsg) authMsg.textContent = "Enter email and password.";
-    return;
-  }
-  if (password !== confirm) {
-    if (authMsg) authMsg.textContent = "Passwords do not match.";
-    return;
-  }
-  try {
-    if (btnRegisterSubmit) btnRegisterSubmit.disabled = true;
-    await getJson("/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, firstName, lastName }),
-    });
-    const u = new URL(window.location.href);
-    if (u.pathname === "/" || u.pathname === "") {
-      u.pathname = "/dashboard";
-      window.history.replaceState(null, "", u.toString());
-    }
-    await refreshStatus();
-  } catch (err) {
-    if (authMsg) authMsg.textContent = err.message || String(err);
-  } finally {
-    if (btnRegisterSubmit) btnRegisterSubmit.disabled = false;
-  }
-}
-
 btnLoginSubmit?.addEventListener("click", () => submitEmailLogin());
-btnRegisterSubmit?.addEventListener("click", () => submitEmailRegister());
 
 loginPassword?.addEventListener("keydown", (e) => {
   if (e.key === "Enter") submitEmailLogin();
-});
-registerPasswordConfirm?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") submitEmailRegister();
 });
 
 githubLoginBtn?.addEventListener("click", () => {
@@ -1322,6 +1273,60 @@ startSyncBtn.addEventListener("click", () => {
   startSync();
 });
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
+
+async function submitDeveloperCredentials() {
+  const cf = statusCache?.credentialFlags;
+  if (!cf) return;
+  const payload = {};
+  if (!cf.hasGithubToken) {
+    const v = credGithubToken?.value?.trim();
+    if (!v) {
+      if (credentialsMsg) credentialsMsg.textContent = "GITHUB_TOKEN is required.";
+      return;
+    }
+    payload.githubToken = v;
+  }
+  if (!cf.hasAccessToken) {
+    const v = credAccessToken?.value?.trim();
+    if (!v) {
+      if (credentialsMsg) credentialsMsg.textContent = "ACCESS_TOKEN is required.";
+      return;
+    }
+    payload.accessToken = v;
+  }
+  if (!cf.hasPersonId) {
+    const v = credPersonId?.value?.trim();
+    if (!v) {
+      if (credentialsMsg) credentialsMsg.textContent = "PERSON_ID is required.";
+      return;
+    }
+    payload.personId = v;
+  }
+  if (Object.keys(payload).length === 0) {
+    if (credentialsMsg) credentialsMsg.textContent = "Nothing to save.";
+    return;
+  }
+  if (credentialsMsg) credentialsMsg.textContent = "Saving…";
+  if (btnSaveCredentials) btnSaveCredentials.disabled = true;
+  try {
+    await getJson("/api/settings/developer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (credentialsMsg) credentialsMsg.textContent = "Saved.";
+    if (credGithubToken) credGithubToken.value = "";
+    if (credAccessToken) credAccessToken.value = "";
+    if (credPersonId) credPersonId.value = "";
+    await refreshStatus();
+  } catch (err) {
+    if (credentialsMsg) credentialsMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnSaveCredentials) btnSaveCredentials.disabled = false;
+  }
+}
+
+btnSaveCredentials?.addEventListener("click", () => submitDeveloperCredentials());
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;

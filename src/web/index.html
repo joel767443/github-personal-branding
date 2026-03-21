@@ -138,7 +138,14 @@
         <div id="serverConfigHint" class="auth-hint muted hidden"></div>
         <div id="loginPanel">
           <h2>Sign in</h2>
-          <p class="muted auth-intro">Use your email and password. Per-developer GitHub access and deploy targets are stored in the database after you connect GitHub in settings.</p>
+          <p class="muted auth-intro">
+            Continue with GitHub to create an account or sign in. Your GitHub access token is stored encrypted for API sync.
+          </p>
+          <div class="row">
+            <button type="button" id="githubLoginBtn" class="btn-github">Continue with GitHub</button>
+          </div>
+          <div class="row auth-divider muted">or</div>
+          <p class="muted auth-intro">Already have a password? Sign in with email.</p>
           <div class="row auth-field">
             <label for="loginEmail">Email</label>
             <input id="loginEmail" type="email" autocomplete="username" />
@@ -148,44 +155,7 @@
             <input id="loginPassword" type="password" autocomplete="current-password" />
           </div>
           <div class="row">
-            <button type="button" id="btnLoginSubmit">Sign in</button>
-          </div>
-          <div class="row">
-            <a href="#" id="linkShowRegister" class="auth-switch">Create an account</a>
-          </div>
-          <div class="row auth-divider muted">or</div>
-          <div class="row">
-            <button type="button" id="githubLoginBtn" class="btn-github">Sign in with GitHub</button>
-          </div>
-        </div>
-        <div id="registerPanel" class="hidden">
-          <h2>Create account</h2>
-          <p class="muted auth-intro">Register to start your developer profile. You will be signed in automatically.</p>
-          <div class="row auth-field">
-            <label for="registerFirstName">First name</label>
-            <input id="registerFirstName" type="text" name="first_name" autocomplete="given-name" />
-          </div>
-          <div class="row auth-field">
-            <label for="registerLastName">Last name</label>
-            <input id="registerLastName" type="text" name="last_name" autocomplete="family-name" />
-          </div>
-          <div class="row auth-field">
-            <label for="registerEmail">Email</label>
-            <input id="registerEmail" type="email" autocomplete="email" />
-          </div>
-          <div class="row auth-field">
-            <label for="registerPassword">Password</label>
-            <input id="registerPassword" type="password" autocomplete="new-password" />
-          </div>
-          <div class="row auth-field">
-            <label for="registerPasswordConfirm">Confirm password</label>
-            <input id="registerPasswordConfirm" type="password" autocomplete="new-password" />
-          </div>
-          <div class="row">
-            <button type="button" id="btnRegisterSubmit">Register</button>
-          </div>
-          <div class="row">
-            <a href="#" id="linkShowLogin" class="auth-switch">Already have an account? Sign in</a>
+            <button type="button" id="btnLoginSubmit">Sign in with email</button>
           </div>
         </div>
         <div id="authMsg" class="muted auth-msg" aria-live="polite"></div>
@@ -221,6 +191,40 @@
         </div>
       </div>
     </div>
+
+    <div
+      id="developerCredentialsGate"
+      class="credentialsGate hidden"
+      aria-modal="true"
+      role="dialog"
+      aria-labelledby="credentialsGateTitle"
+    >
+      <div class="card credentialsGateCard">
+        <h2 id="credentialsGateTitle">Integration credentials</h2>
+        <p class="muted">
+          Your account is missing stored values for <code>GITHUB_TOKEN</code>, <code>ACCESS_TOKEN</code>, and
+          <code>PERSON_ID</code>. Enter them here; they are saved on your developer record (GitHub token and LinkedIn
+          access token are encrypted at rest).
+        </p>
+        <div class="row auth-field" id="credGithubTokenRow">
+          <label for="credGithubToken">GITHUB_TOKEN</label>
+          <input id="credGithubToken" type="password" autocomplete="off" placeholder="GitHub personal access token" />
+        </div>
+        <div class="row auth-field" id="credAccessTokenRow">
+          <label for="credAccessToken">ACCESS_TOKEN</label>
+          <input id="credAccessToken" type="password" autocomplete="off" placeholder="LinkedIn OAuth access token" />
+        </div>
+        <div class="row auth-field" id="credPersonIdRow">
+          <label for="credPersonId">PERSON_ID</label>
+          <input id="credPersonId" type="text" autocomplete="off" placeholder="LinkedIn person / member id" />
+        </div>
+        <div class="row">
+          <button type="button" id="btnSaveCredentials">Save credentials</button>
+        </div>
+        <div id="credentialsMsg" class="muted auth-msg" aria-live="polite"></div>
+      </div>
+    </div>
+
     <script src="/shell.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="/app.js"></script>
