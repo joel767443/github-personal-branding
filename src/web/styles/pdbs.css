@@ -332,6 +332,16 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   margin: 0 auto;
 }
 
+/* Job status / job type doughnuts: full panel width, fixed chart height (Chart.js fills this; maintainAspectRatio is false). */
+.chartCanvasWrapJobStatus,
+.chartCanvasWrapJobType {
+  height: 206px;
+  min-height: 206px;
+  max-width: none;
+  width: 100%;
+  margin: 0;
+}
+
 .right_col .container { flex: 1; display: flex; flex-direction: column; }
 .pdbsFooter {
   margin-top: auto;
