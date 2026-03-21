@@ -55,7 +55,7 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 
 **GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
 
-Per-developer data is stored on `developers` (see Prisma model comments): GitHub tokens (`githubAccessTokenEnc`, `githubRefreshTokenEnc`), `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`, `githubOauthCallbackUrl`), and deploy toggle (`deployPortfolioAfterSync`). Portfolio repo URL is configured via `DEPLOY_REPO_URL` in the server environment when deploy runs.
+Per-developer data is stored on `developers` (see Prisma model comments): GitHub tokens (`githubAccessTokenEnc`, `githubRefreshTokenEnc`), `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and deploy toggle (`deployPortfolioAfterSync`). Portfolio repo URL is configured via `DEPLOY_REPO_URL` in the server environment when deploy runs.
 
 **Portfolio deploy CLI** (manual runs only):
 

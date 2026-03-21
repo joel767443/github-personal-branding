@@ -44,7 +44,6 @@ model User {
 /// - PERSON_ID (LinkedIn member / person id) → linkedin_person_id
 /// - GITHUB_USERNAME / login → github_username, github_login
 /// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
-/// - GITHUB_OAUTH_CALLBACK_URL (optional override for BYO) → github_oauth_callback_url
 /// - DEPLOY_PORTFOLIO_AFTER_SYNC → deploy_portfolio_after_sync
 /// Server-only (not per row): SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, Stripe/Redis keys, etc.
 model Developer {
@@ -80,7 +79,6 @@ model Developer {
   /// Optional “bring your own” GitHub OAuth app (when not using server GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET).
   githubOauthClientId          String? @map("github_oauth_client_id")
   githubOauthClientSecretEnc   String? @map("github_oauth_client_secret_enc") @db.Text
-  githubOauthCallbackUrl       String? @map("github_oauth_callback_url") @db.Text
 
   syncFrequency        SyncFrequency @default(TWO_DAYS) @map("sync_frequency")
   nextScheduledSyncAt  DateTime? @map("next_scheduled_sync_at")

@@ -703,12 +703,6 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
           ? null
           : String(body.githubOauthClientId).trim();
     }
-    if (body.githubOauthCallbackUrl !== undefined) {
-      data.githubOauthCallbackUrl =
-        body.githubOauthCallbackUrl == null || String(body.githubOauthCallbackUrl).trim() === ''
-          ? null
-          : String(body.githubOauthCallbackUrl).trim();
-    }
     if (body.clearGithubOauthClientSecret === true) {
       data.githubOauthClientSecretEnc = null;
     } else if (body.githubOauthClientSecret !== undefined) {

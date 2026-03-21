@@ -34,7 +34,7 @@ function resolveGithubOAuthClientSecretFromEnv(envSnapshot) {
  * When `.env` has `GITHUB_CLIENT_ID` but no OAuth client secret (e.g. only a PAT in `GITHUB_TOKEN`),
  * use a developer row that already stores the same OAuth App id + encrypted client secret (e.g. from settings).
  */
-async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, defaultCallback) {
+async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, callbackUrl) {
   if (!envClientId) return null;
   const dev = await prisma.developer.findFirst({
     where: {
@@ -44,7 +44,6 @@ async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, defaultCa
     select: {
       githubOauthClientId: true,
       githubOauthClientSecretEnc: true,
-      githubOauthCallbackUrl: true,
     },
   });
   if (!dev?.githubOauthClientId || !dev.githubOauthClientSecretEnc) return null;
@@ -55,12 +54,10 @@ async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, defaultCa
     clientSecret = null;
   }
   if (!clientSecret) return null;
-  const cb =
-    (dev.githubOauthCallbackUrl && String(dev.githubOauthCallbackUrl).trim()) || defaultCallback;
   return {
     clientId: String(dev.githubOauthClientId).trim(),
     clientSecret: String(clientSecret).trim(),
-    callbackUrl: cb,
+    callbackUrl,
   };
 }
 
@@ -98,7 +95,6 @@ async function resolveGithubOAuthAppCredentials(req) {
       select: {
         githubOauthClientId: true,
         githubOauthClientSecretEnc: true,
-        githubOauthCallbackUrl: true,
       },
     });
     if (dev?.githubOauthClientId && dev.githubOauthClientSecretEnc) {
@@ -109,19 +105,17 @@ async function resolveGithubOAuthAppCredentials(req) {
         clientSecret = null;
       }
       if (clientSecret) {
-        const cb =
-          (dev.githubOauthCallbackUrl && String(dev.githubOauthCallbackUrl).trim()) || defaultCallback;
         return {
           clientId: String(dev.githubOauthClientId).trim(),
           clientSecret: String(clientSecret).trim(),
-          callbackUrl: cb,
+          callbackUrl: envCallback,
         };
       }
     }
   }
 
   if (envClientId && !envClientSecret) {
-    const fromDb = await findDeveloperOAuthCredentialsByEnvClientId(envClientId, defaultCallback);
+    const fromDb = await findDeveloperOAuthCredentialsByEnvClientId(envClientId, envCallback);
     if (fromDb) return fromDb;
   }
 
