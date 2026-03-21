@@ -62,6 +62,7 @@ const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
 const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
 const githubPatInput = document.getElementById("githubPatInput");
+const deployRepoUrlInput = document.getElementById("deployRepoUrlInput");
 const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
 const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
 const githubPatMsg = document.getElementById("githubPatMsg");
@@ -433,6 +434,7 @@ async function loadSettingsForm() {
       if (el) el.checked = Boolean(row.enabled);
     }
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
+    if (deployRepoUrlInput) deployRepoUrlInput.value = d.deployRepoUrl ?? "";
     if (githubPatConfiguredHint) {
       githubPatConfiguredHint.textContent = d.githubPatConfigured
         ? "A token is saved (paste a new one to replace it)."
@@ -1302,6 +1304,7 @@ saveSettingsBtn?.addEventListener("click", async () => {
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },
         deployPortfolioAfterSync: Boolean(deployPortfolioAfterSync?.checked),
+        deployRepoUrl: deployRepoUrlInput?.value?.trim() ?? "",
       }),
     });
     if (settingsMsg) settingsMsg.textContent = "Saved.";

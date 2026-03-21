@@ -20,10 +20,15 @@ async function buildDeployProcessEnv(developerId) {
     where: { id: developerId },
     select: {
       deployPortfolioAfterSync: true,
+      deployRepoUrl: true,
     },
   });
   if (dev) {
     env.DEPLOY_PORTFOLIO_AFTER_SYNC = dev.deployPortfolioAfterSync !== false ? '1' : '0';
+    const repo = String(dev.deployRepoUrl ?? '').trim();
+    if (repo) {
+      env.DEPLOY_REPO_URL = repo;
+    }
   }
   return env;
 }

@@ -45,6 +45,7 @@ model User {
 /// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
 /// - GitHub PAT for API sync → github_pat_enc (encrypted); falls back to server `GITHUB_TOKEN` when unset
 /// - DEPLOY_PORTFOLIO_AFTER_SYNC → deploy_portfolio_after_sync
+/// - DEPLOY_REPO_URL (optional per dev) → deploy_repo_url; overrides server env for portfolio deploy when set
 /// Server-only (not per row): SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, optional fallback `GITHUB_TOKEN`, Stripe/Redis keys, etc.
 model Developer {
   id            Int       @id @default(autoincrement())
@@ -86,6 +87,8 @@ model Developer {
   lastScheduledSyncAt  DateTime? @map("last_scheduled_sync_at")
 
   deployPortfolioAfterSync Boolean @default(true) @map("deploy_portfolio_after_sync")
+  /// Portfolio README deploy target (`DEPLOY_REPO_URL`). Overrides server env when set.
+  deployRepoUrl          String? @map("deploy_repo_url") @db.Text
 
   stripeCustomerId     String?   @map("stripe_customer_id")
   stripeSubscriptionId String?   @map("stripe_subscription_id")
