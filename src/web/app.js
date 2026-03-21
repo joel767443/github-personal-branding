@@ -63,7 +63,6 @@ const settingsMsg = document.getElementById("settingsMsg");
 const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
 const loginCard = document.getElementById("loginCard");
 const serverConfigHint = document.getElementById("serverConfigHint");
-const authMsg = document.getElementById("authMsg");
 const githubLoginBtn = document.getElementById("githubLoginBtn");
 const profileAvatar = document.getElementById("profileAvatar");
 const profileLogin = document.getElementById("profileLogin");
