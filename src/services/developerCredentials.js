@@ -1,13 +1,14 @@
 const prisma = require('../db/prisma');
 const { createGithubClient } = require('./githubService');
 const { readCurrentEnv } = require('../config/runtimeConfig');
+const { decryptField } = require('../crypto/fieldEncryption');
 
 function mergedEnv() {
   return { ...process.env, ...readCurrentEnv() };
 }
 
 /**
- * GitHub API access uses `GITHUB_TOKEN` from the server environment (`.env` / process env).
+ * GitHub API access: prefers encrypted `githubPatEnc` on the developer row, then `GITHUB_TOKEN` in env.
  * The developer row supplies `githubUsername` / `githubLogin` for which GitHub user to sync.
  * @param {number} developerId
  * @returns {Promise<{ token: string, username: string | null } | null>}
@@ -16,8 +17,6 @@ async function getGithubCredentialsForDeveloper(developerId) {
   if (developerId == null || Number.isNaN(Number(developerId))) {
     return null;
   }
-  const token = String(mergedEnv().GITHUB_TOKEN ?? '').trim();
-  if (!token) return null;
 
   const dev = await prisma.developer.findUnique({
     where: { id: Number(developerId) },
@@ -25,9 +24,23 @@ async function getGithubCredentialsForDeveloper(developerId) {
       githubUsername: true,
       githubLogin: true,
       email: true,
+      githubPatEnc: true,
     },
   });
   if (!dev) return null;
+
+  let token = '';
+  if (dev.githubPatEnc) {
+    try {
+      token = String(decryptField(dev.githubPatEnc) ?? '').trim();
+    } catch (err) {
+      console.warn('getGithubCredentialsForDeveloper: decrypt githubPatEnc failed', err?.message ?? err);
+    }
+  }
+  if (!token) {
+    token = String(mergedEnv().GITHUB_TOKEN ?? '').trim();
+  }
+  if (!token) return null;
 
   const username =
     (dev.githubUsername && String(dev.githubUsername).trim()) ||

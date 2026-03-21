@@ -43,8 +43,9 @@ model User {
 /// - PERSON_ID (LinkedIn member / person id) → linkedin_person_id
 /// - GITHUB_USERNAME / login → github_username, github_login
 /// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
+/// - GitHub PAT for API sync → github_pat_enc (encrypted); falls back to server `GITHUB_TOKEN` when unset
 /// - DEPLOY_PORTFOLIO_AFTER_SYNC → deploy_portfolio_after_sync
-/// Server-only (not per row): GITHUB_TOKEN (GitHub API for sync), SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, Stripe/Redis keys, etc.
+/// Server-only (not per row): SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, optional fallback `GITHUB_TOKEN`, Stripe/Redis keys, etc.
 model Developer {
   id            Int       @id @default(autoincrement())
   firstName     String?  @map("first_name")
@@ -76,6 +77,9 @@ model Developer {
   /// Optional “bring your own” GitHub OAuth app (when not using server GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET).
   githubOauthClientId          String? @map("github_oauth_client_id")
   githubOauthClientSecretEnc   String? @map("github_oauth_client_secret_enc") @db.Text
+
+  /// GitHub personal access token for API sync (encrypted). Preferred over server `GITHUB_TOKEN` when set.
+  githubPatEnc String? @map("github_pat_enc") @db.Text
 
   syncFrequency        SyncFrequency @default(TWO_DAYS) @map("sync_frequency")
   nextScheduledSyncAt  DateTime? @map("next_scheduled_sync_at")

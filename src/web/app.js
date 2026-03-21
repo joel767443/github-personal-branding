@@ -61,6 +61,11 @@ const btnCheckout = document.getElementById("btnCheckout");
 const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
 const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
+const githubPatInput = document.getElementById("githubPatInput");
+const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
+const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
+const btnClearGithubPat = document.getElementById("btnClearGithubPat");
+const githubPatMsg = document.getElementById("githubPatMsg");
 const loginCard = document.getElementById("loginCard");
 const serverConfigHint = document.getElementById("serverConfigHint");
 const githubLoginBtn = document.getElementById("githubLoginBtn");
@@ -429,6 +434,12 @@ async function loadSettingsForm() {
       if (el) el.checked = Boolean(row.enabled);
     }
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
+    if (githubPatConfiguredHint) {
+      githubPatConfiguredHint.textContent = d.githubPatConfigured
+        ? "A token is saved (paste a new one to replace it)."
+        : "No token saved yet.";
+    }
+    if (githubPatInput) githubPatInput.value = "";
   } catch (_) {
     /* ignore */
   }
@@ -1021,7 +1032,8 @@ async function refreshStatus() {
       syncState.textContent = "Login required to start sync";
       startSyncBtn.disabled = true;
     } else if (status.needsDeveloperCredentials) {
-      syncState.textContent = "Set GITHUB_TOKEN in the server environment to start sync";
+      syncState.textContent =
+        "Add a GitHub PAT under Account settings, or set GITHUB_TOKEN on the server, to start sync";
       startSyncBtn.disabled = true;
     } else if (status.syncInProgress) {
       syncState.textContent = "Sync running...";
@@ -1248,6 +1260,58 @@ async function submitLinkedinCredentials() {
 }
 
 btnSaveLinkedinCredentials?.addEventListener("click", () => submitLinkedinCredentials());
+
+async function submitGithubPat() {
+  const t = githubPatInput?.value?.trim();
+  if (!t) {
+    if (githubPatMsg) githubPatMsg.textContent = "Enter a GitHub personal access token (or use Remove).";
+    return;
+  }
+  if (githubPatMsg) githubPatMsg.textContent = "Saving…";
+  if (btnSaveGithubPat) btnSaveGithubPat.disabled = true;
+  if (btnClearGithubPat) btnClearGithubPat.disabled = true;
+  try {
+    await getJson("/api/settings/developer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ githubPat: t }),
+    });
+    if (githubPatMsg) githubPatMsg.textContent = "Saved.";
+    if (githubPatInput) githubPatInput.value = "";
+    await loadSettingsForm();
+    await refreshStatus();
+  } catch (err) {
+    if (githubPatMsg) githubPatMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnSaveGithubPat) btnSaveGithubPat.disabled = false;
+    if (btnClearGithubPat) btnClearGithubPat.disabled = false;
+  }
+}
+
+async function clearGithubPat() {
+  if (githubPatMsg) githubPatMsg.textContent = "Removing…";
+  if (btnSaveGithubPat) btnSaveGithubPat.disabled = true;
+  if (btnClearGithubPat) btnClearGithubPat.disabled = true;
+  try {
+    await getJson("/api/settings/developer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clearGithubPat: true }),
+    });
+    if (githubPatMsg) githubPatMsg.textContent = "Removed.";
+    if (githubPatInput) githubPatInput.value = "";
+    await loadSettingsForm();
+    await refreshStatus();
+  } catch (err) {
+    if (githubPatMsg) githubPatMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnSaveGithubPat) btnSaveGithubPat.disabled = false;
+    if (btnClearGithubPat) btnClearGithubPat.disabled = false;
+  }
+}
+
+btnSaveGithubPat?.addEventListener("click", () => submitGithubPat());
+btnClearGithubPat?.addEventListener("click", () => clearGithubPat());
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;

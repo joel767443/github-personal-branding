@@ -141,10 +141,11 @@ let linkedinImportRunId = null;
 
 function sanitizeDeveloperForClient(dev) {
   if (!dev || typeof dev !== 'object') return dev;
-  const { githubOauthClientSecretEnc, ...rest } = dev;
+  const { githubOauthClientSecretEnc, githubPatEnc, ...rest } = dev;
   return {
     ...rest,
     githubOauthClientSecretConfigured: Boolean(githubOauthClientSecretEnc),
+    githubPatConfigured: Boolean(githubPatEnc),
   };
 }
 
@@ -734,6 +735,14 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
       const p = String(body.personId ?? '').trim();
       data.linkedinPersonId = p || null;
     }
+    if (body.clearGithubPat === true) {
+      data.githubPatEnc = null;
+    } else if (body.githubPat !== undefined) {
+      const g = String(body.githubPat ?? '');
+      if (g.trim()) {
+        data.githubPatEnc = encryptField(g);
+      }
+    }
     if (Object.keys(data).length) {
       await prisma.developer.update({ where: { id: developer.id }, data });
     }
@@ -846,11 +855,13 @@ app.get('/setup/status', async (req, res) => {
           select: {
             linkedinAccessTokenEnc: true,
             linkedinPersonId: true,
+            githubPatEnc: true,
           },
         });
         const githubFromEnv = Boolean(String(envSnapshot.GITHUB_TOKEN ?? '').trim());
+        const githubFromRow = Boolean(row?.githubPatEnc);
         credentialFlags = {
-          hasGithubToken: githubFromEnv,
+          hasGithubToken: githubFromEnv || githubFromRow,
           hasAccessToken: Boolean(row?.linkedinAccessTokenEnc),
           hasPersonId: Boolean(row?.linkedinPersonId && String(row.linkedinPersonId).trim()),
         };

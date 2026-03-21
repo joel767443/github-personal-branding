@@ -90,6 +90,21 @@
         <div class="row">
           <label><input type="checkbox" id="deployPortfolioAfterSync" /> Deploy portfolio automatically after sync</label>
         </div>
+        <p class="muted">GitHub API (repo sync)</p>
+        <p class="muted">
+          Fine-grained or classic personal access token with access to your repositories. Stored encrypted on your
+          developer record. Optional when the server provides a shared <code>GITHUB_TOKEN</code>.
+        </p>
+        <div class="row auth-field">
+          <label for="githubPatInput">GitHub PAT</label>
+          <input id="githubPatInput" type="password" autocomplete="off" placeholder="Paste token to save" />
+        </div>
+        <div id="githubPatConfiguredHint" class="muted"></div>
+        <div class="row">
+          <button type="button" id="btnSaveGithubPat">Save GitHub token</button>
+          <button type="button" id="btnClearGithubPat">Remove stored token</button>
+        </div>
+        <div id="githubPatMsg" class="muted" aria-live="polite"></div>
         <div class="row">
           <button type="button" id="btnCheckout">Open Stripe checkout</button>
           <button type="button" id="btnPortal">Billing portal</button>
@@ -107,7 +122,8 @@
         <div id="loginPanel">
           <h2>Sign in</h2>
           <p class="muted auth-intro">
-            Continue with GitHub to create an account or sign in. Your GitHub access token is stored encrypted for API sync.
+            Continue with GitHub to create an account or sign in. Save a GitHub personal access token under Account settings
+            for repository sync (encrypted), or use a shared server <code>GITHUB_TOKEN</code>.
           </p>
           <div class="row">
             <button type="button" id="githubLoginBtn" class="btn-github">Continue with GitHub</button>
