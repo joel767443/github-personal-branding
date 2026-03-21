@@ -961,13 +961,14 @@ async function refreshStatus() {
     const showSyncCard =
       postSetupAwaitingAuth || (showSync && !forceUploadUi && isDashboardRoute);
     setHidden(syncCard, !showSyncCard);
-    // Only show LinkedIn upload UI on the dedicated upload route,
-    // or on the Profile page when GitHub sync is complete (allows re-upload).
+    // LinkedIn ZIP upload: always on `/profile`; on `/dashboard` only after GitHub sync (upload step or completed).
+    // `forceUploadUi` is reserved for a future `/…` route with `kind: "upload"` (currently unused).
     const showUploadCard =
       !showSetup &&
       !showLogin &&
       (forceUploadUi ||
-        (!isDashboardRoute && isProfilePage && (showUploadStep || syncCompleted)));
+        isProfilePage ||
+        (isDashboardRoute && (showUploadStep || syncCompleted)));
     setHidden(uploadCard, !showUploadCard);
 
     const needsLi = Boolean(status.needsLinkedInCredentials);
@@ -1066,11 +1067,10 @@ async function refreshStatus() {
       openProgressSSE();
     }
 
+    // ZIP import parses the official export offline; it does not require LinkedIn API creds (those are optional / other flows).
     if (uploadLinkedinZipBtn && showUploadCard) {
       uploadLinkedinZipBtn.disabled = Boolean(
-        status.syncInProgress ||
-          status.linkedinImportInProgress ||
-          status.needsLinkedInCredentials,
+        status.syncInProgress || status.linkedinImportInProgress,
       );
     }
 

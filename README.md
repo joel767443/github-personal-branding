@@ -56,15 +56,15 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 
 **GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
 
-Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and deploy toggle (`deployPortfolioAfterSync`). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Portfolio repo URL is configured via `DEPLOY_REPO_URL` in the server environment when deploy runs.
+Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), deploy toggle (`deployPortfolioAfterSync`), and **portfolio deploy target URL** in **`deploy_repo_url`** (set in the dashboard as “Deploy repo URL”). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Optional server `DEPLOY_REPO_URL` can still override for a process when set; otherwise deploy reads `deploy_repo_url` from the database.
 
 **Portfolio deploy CLI** (manual runs only):
 
 | Variable | Purpose |
 |----------|---------|
-| `PORTFOLIO_DEVELOPER_ID` | Developer id when using `deploy-portfolio:regen` CLI |
+| `PORTFOLIO_DEVELOPER_ID` | Which `developers` row to use for deploy / regen when multiple exist; pairs with that row’s `deploy_repo_url` if `DEPLOY_REPO_URL` is unset |
 
-When the app runs deploy after sync, it passes each developer’s deploy fields into the deploy script as process env (not from `.env`).
+When the app runs deploy after sync, it passes each developer’s deploy settings (including `deploy_repo_url` as `DEPLOY_REPO_URL` when set) into the deploy script as process env (not from `.env`).
 
 See `.example.env` for placeholders.
 
@@ -72,7 +72,7 @@ See `.example.env` for placeholders.
 
 | Script | Command |
 |--------|---------|
-| `npm run deploy-portfolio` | Push generated `./portfolio` (repo/branch from env only for manual CLI; production uses DB per developer) |
+| `npm run deploy-portfolio` | Push generated `./portfolio` (uses `developers.deploy_repo_url` when `DEPLOY_REPO_URL` is unset) |
 | `npm run deploy-portfolio:regen` | Regenerate portfolio from DB, then deploy |
 | `npm run push:origin` | `git push origin HEAD` (this app’s source repo) |
 

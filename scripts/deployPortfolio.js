@@ -6,11 +6,12 @@
  *   node scripts/deployPortfolio.js
  *   node scripts/deployPortfolio.js --regenerate
  *
- * The API’s deploy runner sets DEPLOY_PORTFOLIO_AFTER_SYNC per developer from the database (not from a shared
- * `.env`). Set DEPLOY_REPO_URL in the server environment for portfolio deploy. Branch defaults to `main` unless you
- * set DEPLOY_BRANCH in the environment.
+ * The API’s deploy runner sets DEPLOY_PORTFOLIO_AFTER_SYNC and can set DEPLOY_REPO_URL from the developer’s
+ * `deploy_repo_url` in the database. For manual runs, if `DEPLOY_REPO_URL` is unset, the script loads the deploy
+ * repo URL from the same column (using `PORTFOLIO_DEVELOPER_ID`, `--developer-id`, or the first developer).
+ * Branch defaults to `main` unless you set `DEPLOY_BRANCH` in the environment.
  *
- * Manual CLI (optional): DEPLOY_REPO_URL, DEPLOY_BRANCH, DEPLOY_README_REMOTE, PORTFOLIO_DEVELOPER_ID.
+ * Manual CLI (optional): DEPLOY_REPO_URL, DEPLOY_BRANCH, DEPLOY_README_REMOTE, PORTFOLIO_DEVELOPER_ID, `--developer-id`.
  *
  * Push this service’s own code with `npm run push:origin` (uses remote origin, e.g. github-personal-branding).
  */
@@ -79,6 +80,34 @@ async function regeneratePortfolio({ developerId }) {
       onProgress: (label, extra) => console.log(label, extra != null ? extra : ""),
     });
     console.log(`Regenerated portfolio for developerId=${id}`);
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+/**
+ * Resolve HTTPS deploy target: `DEPLOY_REPO_URL` env, else `developers.deploy_repo_url` for the given or first dev.
+ * @param {number | null} developerId — from `--developer-id` / `PORTFOLIO_DEVELOPER_ID`, or null to use first dev
+ * @returns {Promise<string>}
+ */
+async function resolveDeployRepoUrlFromDb(developerId) {
+  const fromEnv = String(process.env.DEPLOY_REPO_URL || "").trim();
+  if (fromEnv) return fromEnv;
+
+  const prisma = require("../src/db/prisma");
+  try {
+    let id = developerId;
+    if (id == null || Number.isNaN(id)) {
+      const dev = await prisma.developer.findFirst({ orderBy: { id: "asc" } });
+      id = dev?.id ?? null;
+    }
+    if (id == null) return "";
+
+    const row = await prisma.developer.findUnique({
+      where: { id },
+      select: { deployRepoUrl: true },
+    });
+    return String(row?.deployRepoUrl ?? "").trim();
   } finally {
     await prisma.$disconnect();
   }
@@ -170,7 +199,7 @@ function deployPortfolioFiles(options = {}) {
 
   if (!repoUrl) {
     throw new Error(
-      "DEPLOY_REPO_URL is not set. Set it in the environment (or pass repoUrl) for portfolio deploy.",
+      "DEPLOY_REPO_URL is not set. Set it in the environment, save Deploy repo URL in the dashboard, or pass repoUrl.",
     );
   }
 
@@ -210,18 +239,26 @@ function deployPortfolioFiles(options = {}) {
 }
 
 async function main() {
+  require("dotenv").config({ path: path.join(ROOT, ".env") });
   const opts = parseArgs();
   const devIdFromEnv = process.env.PORTFOLIO_DEVELOPER_ID
     ? Number(process.env.PORTFOLIO_DEVELOPER_ID)
     : null;
+  const developerIdForDeploy =
+    opts.developerId != null && !Number.isNaN(opts.developerId)
+      ? opts.developerId
+      : Number.isFinite(devIdFromEnv)
+        ? devIdFromEnv
+        : null;
 
   if (opts.regenerate) {
     await regeneratePortfolio({
-      developerId: opts.developerId ?? (Number.isFinite(devIdFromEnv) ? devIdFromEnv : null),
+      developerId: developerIdForDeploy,
     });
   }
 
-  deployPortfolioFiles({ gitInherit: true });
+  const repoUrl = await resolveDeployRepoUrlFromDb(developerIdForDeploy);
+  deployPortfolioFiles({ repoUrl, gitInherit: true });
 }
 
 if (require.main === module) {
