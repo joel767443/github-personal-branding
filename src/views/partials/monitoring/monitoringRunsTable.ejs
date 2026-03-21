@@ -19,11 +19,13 @@
         </thead>
         <tbody>
           <% for (const r of runs) { %>
-            <% const st = String(r?.status ?? "").toLowerCase(); %>
-            <% let badge = "jobStatusBadge"; %>
-            <% if (st === "running") { badge += " jobStatusBadge--running"; } %>
-            <% else if (st === "completed") { badge += " jobStatusBadge--completed"; } %>
-            <% else if (st === "failed") { badge += " jobStatusBadge--failed"; } %>
+            <% 
+              const st = String(r?.status ?? "").toLowerCase();
+              let badge = "jobStatusBadge";
+              if (st === "running") badge += " jobStatusBadge--running";
+              else if (st === "completed") badge += " jobStatusBadge--completed";
+              else if (st === "failed") badge += " jobStatusBadge--failed";
+            %>
             <tr>
               <td class="monoCell"><%= r?.id ?? "" %></td>
               <td><%= r?.jobType ?? "" %></td>
