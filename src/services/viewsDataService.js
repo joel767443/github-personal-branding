@@ -10,21 +10,16 @@ const {
   countJobRuns,
   countFailures,
 } = require("./monitoringService");
+const {
+  omitId,
+  omitIdDeveloperId,
+  omitIdDeveloperSort,
+  safeJson,
+} = require("../utils/prismaJson");
 
 const PAGE_SIZE_CV = 4;
 const PAGE_SIZE_REPOS_GRID = 16;
 const PAGE_SIZE_TABLE = 4;
-
-const omitId = { id: true };
-const omitIdDeveloperId = { id: true, developerId: true };
-const omitIdDeveloperSort = { id: true, developerId: true, sortOrder: true };
-
-function safeJson(value) {
-  // Prisma can return BigInt in some cases; normalize to string so EJS can render.
-  return JSON.parse(
-    JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v)),
-  );
-}
 
 async function currentDeveloperId(req) {
   const resolved = await resolveDeveloperFromSession(req);

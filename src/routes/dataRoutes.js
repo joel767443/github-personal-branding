@@ -4,20 +4,14 @@ const requireLogin = require("../middleware/requireLogin");
 const { resolveDeveloperFromSession } = require("../services/sessionDeveloperService");
 const { respondError } = require("../utils/httpErrors");
 const { endorsementApiOmit } = require("../constants/apiResponseOmit");
+const {
+  omitId,
+  omitIdDeveloperId,
+  omitIdDeveloperSort,
+  safeJson,
+} = require("../utils/prismaJson");
 
 const router = express.Router();
-
-/** Omit primary keys (and owning developer FK) from JSON for dashboard /data views. */
-const omitId = { id: true };
-const omitIdDeveloperId = { id: true, developerId: true };
-/** Models with a `sortOrder` column (omit it from JSON; `orderBy` still works in queries). */
-const omitIdDeveloperSort = { id: true, developerId: true, sortOrder: true };
-
-function safeJson(value) {
-  return JSON.parse(
-    JSON.stringify(value, (_, v) => (typeof v === "bigint" ? v.toString() : v)),
-  );
-}
 
 async function currentDeveloperId(req, res) {
   const resolved = await resolveDeveloperFromSession(req);

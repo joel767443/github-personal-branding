@@ -79,6 +79,11 @@ function readCurrentEnv() {
   return envMapFromEntries(parseEnvFile(raw));
 }
 
+/** Merge persisted `.env` with `process.env` (process wins for overrides). */
+function mergedEnv() {
+  return { ...process.env, ...readCurrentEnv() };
+}
+
 function ensureEnvFromExample() {
   if (fs.existsSync(ENV_PATH)) return false;
   if (!fs.existsSync(EXAMPLE_ENV_PATH)) return false;
@@ -101,6 +106,7 @@ module.exports = {
   buildDatabaseUrl,
   missingConfigKeys,
   readCurrentEnv,
+  mergedEnv,
   ensureEnvFromExample,
   ensureSessionSecret,
 };

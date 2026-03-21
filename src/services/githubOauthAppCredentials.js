@@ -1,10 +1,6 @@
 const prisma = require('../db/prisma');
 const { decryptField } = require('../crypto/fieldEncryption');
-const { readCurrentEnv } = require('../config/runtimeConfig');
-
-function mergedEnv() {
-  return { ...process.env, ...readCurrentEnv() };
-}
+const { mergedEnv } = require('../config/runtimeConfig');
 
 /**
  * Personal access tokens (PATs) must never be sent as OAuth `client_secret` — GitHub returns
@@ -152,6 +148,5 @@ async function isGithubOAuthConfigured(req) {
 module.exports = {
   resolveGithubOAuthAppCredentials,
   isGithubOAuthConfigured,
-  mergedEnv,
   resolveGithubOAuthClientSecretFromEnv,
 };

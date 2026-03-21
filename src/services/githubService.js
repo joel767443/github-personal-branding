@@ -32,10 +32,6 @@ function getEnvGithubClient() {
   return createGithubClient(token);
 }
 
-function hasGithubToken() {
-  return Boolean(String(process.env.GITHUB_TOKEN ?? '').trim());
-}
-
 /**
  * @param {import('axios').AxiosInstance} github
  */
@@ -171,7 +167,6 @@ async function getRepoGitTreeFiles(github, owner, repo, branch = 'main') {
 module.exports = {
   createGithubClient,
   getEnvGithubClient,
-  hasGithubToken,
   getRepos,
   getCommits,
   getRepoLanguages,

@@ -27,6 +27,7 @@ const {
   missingConfigKeys,
   ensureEnvFromExample,
   readCurrentEnv,
+  mergedEnv,
   ENV_PATH,
   ensureSessionSecret,
 } = require('./config/runtimeConfig');
@@ -39,7 +40,6 @@ const prisma = require('./db/prisma');
 const {
   resolveGithubOAuthAppCredentials,
   isGithubOAuthConfigured,
-  mergedEnv,
   resolveGithubOAuthClientSecretFromEnv,
 } = require('./services/githubOauthAppCredentials');
 const { encryptField } = require('./crypto/fieldEncryption');
@@ -48,6 +48,7 @@ const { syncQueue, linkedinQueue, queuesEnabled } = require('./queue/jobQueues')
 const { registerWorkers } = require('./workers/registerWorkers');
 const stripeService = require('./services/stripeService');
 const { parseSyncFrequency } = require('./services/syncFrequencyHelpers');
+const { respondError } = require('./utils/httpErrors');
 
 function envFlagTrue(name) {
   const v = String(process.env[name] ?? '').toLowerCase().trim();
@@ -297,10 +298,6 @@ const architectureWithDevelopersInclude = {
     },
   },
 };
-
-function respondError(res, status, error, details) {
-  res.status(status).json({ error, status, details });
-}
 
 function parseIntParam(value) {
   const n = Number(value);

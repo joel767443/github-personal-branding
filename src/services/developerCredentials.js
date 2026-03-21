@@ -1,11 +1,7 @@
 const prisma = require('../db/prisma');
 const { createGithubClient } = require('./githubService');
-const { readCurrentEnv } = require('../config/runtimeConfig');
+const { mergedEnv } = require('../config/runtimeConfig');
 const { decryptField } = require('../crypto/fieldEncryption');
-
-function mergedEnv() {
-  return { ...process.env, ...readCurrentEnv() };
-}
 
 /**
  * GitHub API access: prefers encrypted `githubPatEnc` on the developer row, then `GITHUB_TOKEN` in env.
