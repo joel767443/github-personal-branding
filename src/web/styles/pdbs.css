@@ -274,7 +274,7 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 .tileCount { background: #131a32; border: 1px solid #273056; border-radius: 10px; padding: 14px; text-align: center; }
 .tileCount .tileTitle {
   font-family: var(--pdbs-font-sans);
-  font-size: var(--pdbs-fs-small);
+  font-size: var(--pdbs-fs-body);
   line-height: var(--pdbs-lh-body);
   color: var(--pdbs-color-label);
 }
