@@ -3,7 +3,7 @@ const path = require('path');
 const os = require('os');
 const AdmZip = require('adm-zip');
 const { parse } = require('csv-parse/sync');
-const prisma = require('../db/prisma');
+const { developerPortfolioPersistence } = require('../persistence/developerPortfolioPersistence');
 
 const TMP_PREFIX = 'linkedin-export-';
 const MAX_ZIP_ENTRIES = 3000;
@@ -64,6 +64,272 @@ function cell(nRow, candidates) {
 }
 
 /**
+ * Parse LinkedIn export files into a neutral snapshot for persistence.
+ * @param {object} ctx
+ * @param {(p: string|null) => string|null} ctx.pick
+ * @param {(p: string|null) => Record<string, string>[]} ctx.recordsFor
+ */
+function buildResumeSnapshotFromLinkedIn({ pick, recordsFor }) {
+  /** @type {import('../persistence/dtos').ResumeImportFilePresence} */
+  const filePresence = {};
+
+  const profilePath = pick('profile');
+  filePresence.profile = Boolean(profilePath);
+  /** @type {import('../persistence/dtos').ResumeProfilePatch|undefined} */
+  let profile;
+  if (profilePath) {
+    const rows = recordsFor(profilePath);
+    const row = rows[0];
+    profile = {
+      linkedinSummary: row ? cell(normalizeKey(row), ['summary']) ?? undefined : undefined,
+      csvRowPresent: Boolean(row),
+    };
+  }
+
+  const positionsPath = pick('positions', 'experience');
+  filePresence.positions = Boolean(positionsPath);
+  /** @type {import('../persistence/dtos').ResumeExperienceInput[]} */
+  const experiences = [];
+  if (positionsPath) {
+    let so = 0;
+    for (const row of recordsFor(positionsPath)) {
+      const n = normalizeKey(row);
+      const start = cell(n, ['started on', 'start date']);
+      const end = cell(n, ['finished on', 'end date']);
+      const dates =
+        start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
+      experiences.push({
+        title: cell(n, ['title', 'position title']),
+        company: cell(n, ['company name', 'company']),
+        dates,
+        location: cell(n, ['location']),
+        description: cell(n, ['description']),
+        sortOrder: so++,
+      });
+    }
+  }
+
+  const educationPath = pick('education');
+  filePresence.education = Boolean(educationPath);
+  /** @type {import('../persistence/dtos').ResumeEducationInput[]} */
+  const education = [];
+  if (educationPath) {
+    let so = 0;
+    for (const row of recordsFor(educationPath)) {
+      const n = normalizeKey(row);
+      const degreePart = cell(n, ['degree name', 'degree']);
+      const fieldPart = cell(n, ['fields of study', 'field of study']);
+      const degree = [degreePart, fieldPart].filter(Boolean).join(' — ') || null;
+      const start = cell(n, ['start date', 'started on']);
+      const end = cell(n, ['end date', 'finished on']);
+      const dates =
+        start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
+      education.push({
+        degree,
+        institution: cell(n, ['school name', 'school']),
+        dates,
+        location: cell(n, ['location']),
+        sortOrder: so++,
+      });
+    }
+  }
+
+  const certPath = pick('certifications', 'certification', 'certificationsandlicenses');
+  filePresence.certifications = Boolean(certPath);
+  /** @type {import('../persistence/dtos').ResumeCertificationInput[]} */
+  const certifications = [];
+  if (certPath) {
+    let so = 0;
+    for (const row of recordsFor(certPath)) {
+      const n = normalizeKey(row);
+      certifications.push({
+        name: cell(n, ['name', 'certification name', 'title']),
+        issuer: cell(n, ['authority', 'issuer', 'company']),
+        issued: cell(n, ['time period', 'issued date', 'started on']),
+        sortOrder: so++,
+      });
+    }
+  }
+
+  const skillsPath = pick('skills', 'skill');
+  filePresence.skills = Boolean(skillsPath);
+  /** @type {import('../persistence/dtos').ResumeSkillInput[]} */
+  const skills = [];
+  if (skillsPath) {
+    const seenSkill = new Set();
+    let so = 0;
+    for (const row of recordsFor(skillsPath)) {
+      const n = normalizeKey(row);
+      const name = cell(n, ['name', 'skill', 'title']);
+      if (!name) continue;
+      const key = name.toLowerCase();
+      if (seenSkill.has(key)) continue;
+      seenSkill.add(key);
+      skills.push({ name, sortOrder: so++ });
+    }
+  }
+
+  const endorsementsPath = pick(
+    'endorsementreceivedinfo',
+    'endorsementsreceivedinfo',
+    'endorsementsinfo',
+    'endorsementsreceived',
+    'receivedendorsements',
+    'endorsements',
+    'endorsement',
+  );
+
+  /** @type {import('../persistence/dtos').ResumeEndorsementsSection} */
+  let endorsements;
+  if (endorsementsPath) {
+    /** @type {import('../persistence/dtos').ResumeEndorsementInput[]} */
+    const rows = [];
+    let so = 0;
+    for (const row of recordsFor(endorsementsPath)) {
+      const n = normalizeKey(row);
+      const skillName = cell(n, [
+        'skill',
+        'skill name',
+        'endorsement skill',
+        'endorsed skill',
+        'endorsedskills',
+        'name',
+      ]);
+      const endorserFirstName = cell(n, [
+        'first name',
+        'endorser first name',
+        'associate first name',
+        'first_name',
+      ]);
+      const endorserLastName = cell(n, [
+        'last name',
+        'endorser last name',
+        'associate last name',
+        'last_name',
+      ]);
+      const fullName = cell(n, [
+        'associate name',
+        'member name',
+        'endorser',
+        'endorser name',
+        'endorser fullname',
+        'endorser full name',
+      ]);
+      let first = endorserFirstName;
+      let last = endorserLastName;
+      if (!first && !last && fullName) {
+        const parts = fullName.split(/\s+/).filter(Boolean);
+        first = parts[0] ?? null;
+        last = parts.length > 1 ? parts.slice(1).join(' ') : null;
+      }
+      if (!skillName && !first && !last && !fullName) continue;
+      rows.push({
+        skillName,
+        endorserFirstName: first,
+        endorserLastName: last,
+        endorserCompany: cell(n, ['company', 'endorser company', 'organization']),
+        endorserJobTitle: cell(n, ['job title', 'title', 'position', 'headline', 'occupation']),
+        endorsedOn: cell(n, [
+          'endorsement date',
+          'endorsed on',
+          'date',
+          'connection date',
+          'created',
+          'created at',
+          'timestamp',
+        ]),
+        sortOrder: so++,
+      });
+    }
+    endorsements = {
+      fileMissing: false,
+      fileBasename: path.basename(endorsementsPath),
+      rows,
+    };
+  } else {
+    endorsements = { fileMissing: true, rows: [] };
+  }
+
+  const projectsPath = pick('projects', 'project');
+  filePresence.projects = Boolean(projectsPath);
+  /** @type {import('../persistence/dtos').ResumeProjectInput[]} */
+  const projects = [];
+  if (projectsPath) {
+    let so = 0;
+    for (const row of recordsFor(projectsPath)) {
+      const n = normalizeKey(row);
+      const start = cell(n, ['started on', 'start date']);
+      const end = cell(n, ['finished on', 'end date']);
+      const dates =
+        start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
+      projects.push({
+        title: cell(n, ['title', 'name']),
+        description: cell(n, ['description']),
+        url: cell(n, ['url']),
+        dates,
+        source: 'linkedin',
+        sortOrder: so++,
+      });
+    }
+  }
+
+  const recPath = pick('recommendationsreceived', 'recommendations', 'givenrecommendations');
+  filePresence.recommendations = Boolean(recPath);
+  /** @type {import('../persistence/dtos').ResumeRecommendationInput[]} */
+  const recommendations = [];
+  if (recPath) {
+    let so = 0;
+    for (const row of recordsFor(recPath)) {
+      const n = normalizeKey(row);
+      recommendations.push({
+        recommenderFirstName: cell(n, ['first name']),
+        recommenderLastName: cell(n, ['last name']),
+        company: cell(n, ['company']),
+        jobTitle: cell(n, ['job title', 'title']),
+        relationship: cell(n, ['relationship']),
+        text: cell(n, ['recommendation', 'recommendation text', 'text', 'content']),
+        date: cell(n, ['creation date', 'date', 'created']),
+        sortOrder: so++,
+      });
+    }
+  }
+
+  const pubPath = pick('publications', 'publication');
+  filePresence.publications = Boolean(pubPath);
+  /** @type {import('../persistence/dtos').ResumePublicationInput[]} */
+  const publications = [];
+  if (pubPath) {
+    let so = 0;
+    for (const row of recordsFor(pubPath)) {
+      const n = normalizeKey(row);
+      publications.push({
+        title: cell(n, ['name', 'title']),
+        publisher: cell(n, ['publisher']),
+        date: cell(n, ['publication date', 'date']),
+        url: cell(n, ['publication url', 'url']),
+        description: cell(n, ['description', 'summary']),
+        sortOrder: so++,
+      });
+    }
+  }
+
+  return {
+    snapshot: {
+      filePresence,
+      profile,
+      experiences,
+      education,
+      certifications,
+      skills,
+      endorsements,
+      projects,
+      recommendations,
+      publications,
+    },
+  };
+}
+
+/**
  * @param {{ zipPath?: string, buffer?: Buffer, developerId: number, onProgress?: (label: string, extra?: object) => void }} opts
  */
 async function importLinkedInExport(opts) {
@@ -79,17 +345,6 @@ async function importLinkedInExport(opts) {
 
   onProgress('LinkedIn: extracting archive', { phase: 'extract' });
   const tmp = extractZipSafely(buf);
-  const stats = {
-    profile: false,
-    experiences: 0,
-    education: 0,
-    certifications: 0,
-    skills: 0,
-    endorsements: 0,
-    projects: 0,
-    recommendations: 0,
-    publications: 0,
-  };
 
   try {
     const csvFiles = walkCsvFiles(tmp);
@@ -123,284 +378,11 @@ async function importLinkedInExport(opts) {
       });
     };
 
-    await prisma.$transaction(async (tx) => {
-      onProgress('LinkedIn: clearing previous LinkedIn import data', { phase: 'clear' });
-      await tx.certification.deleteMany({ where: { developerId } });
-      await tx.developerExperience.deleteMany({ where: { developerId } });
-      await tx.education.deleteMany({ where: { developerId } });
-      await tx.developerLinkedinSkill.deleteMany({ where: { developerId } });
-      await tx.developerLinkedinReceivedEndorsement.deleteMany({ where: { developerId } });
-      await tx.developerRecommendation.deleteMany({ where: { developerId } });
-      await tx.developerPublication.deleteMany({ where: { developerId } });
-      await tx.project.deleteMany({ where: { developerId, source: 'linkedin' } });
+    const { snapshot } = buildResumeSnapshotFromLinkedIn({ pick, recordsFor });
 
-      const profilePath = pick('profile');
-      if (profilePath) {
-        onProgress('LinkedIn: importing profile', { phase: 'profile' });
-        const rows = recordsFor(profilePath);
-        const row = rows[0];
-        if (row) {
-          stats.profile = true;
-          const n = normalizeKey(row);
-          const summary = cell(n, ['summary']);
-          const patch = {};
-          if (summary) patch.linkedinSummary = summary;
-          if (Object.keys(patch).length) {
-            await tx.developer.update({ where: { id: developerId }, data: patch });
-          }
-        }
-      }
-
-      const positionsPath = pick('positions', 'experience');
-      if (positionsPath) {
-        onProgress('LinkedIn: importing experience (positions)', { phase: 'positions' });
-        let so = 0;
-        for (const row of recordsFor(positionsPath)) {
-          const n = normalizeKey(row);
-          const start = cell(n, ['started on', 'start date']);
-          const end = cell(n, ['finished on', 'end date']);
-          const dates =
-            start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
-          await tx.developerExperience.create({
-            data: {
-              developerId,
-              title: cell(n, ['title', 'position title']),
-              company: cell(n, ['company name', 'company']),
-              dates,
-              location: cell(n, ['location']),
-              description: cell(n, ['description']),
-              sortOrder: so++,
-            },
-          });
-          stats.experiences += 1;
-        }
-      }
-
-      const educationPath = pick('education');
-      if (educationPath) {
-        onProgress('LinkedIn: importing education', { phase: 'education' });
-        let so = 0;
-        for (const row of recordsFor(educationPath)) {
-          const n = normalizeKey(row);
-          const degreePart = cell(n, ['degree name', 'degree']);
-          const fieldPart = cell(n, ['fields of study', 'field of study']);
-          const degree = [degreePart, fieldPart].filter(Boolean).join(' — ') || null;
-          const start = cell(n, ['start date', 'started on']);
-          const end = cell(n, ['end date', 'finished on']);
-          const dates =
-            start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
-          await tx.education.create({
-            data: {
-              developerId,
-              degree,
-              institution: cell(n, ['school name', 'school']),
-              dates,
-              location: cell(n, ['location']),
-              sortOrder: so++,
-            },
-          });
-          stats.education += 1;
-        }
-      }
-
-      const certPath = pick('certifications', 'certification', 'certificationsandlicenses');
-      if (certPath) {
-        onProgress('LinkedIn: importing certifications', { phase: 'certifications' });
-        let so = 0;
-        for (const row of recordsFor(certPath)) {
-          const n = normalizeKey(row);
-          await tx.certification.create({
-            data: {
-              developerId,
-              name: cell(n, ['name', 'certification name', 'title']),
-              issuer: cell(n, ['authority', 'issuer', 'company']),
-              issued: cell(n, ['time period', 'issued date', 'started on']),
-              sortOrder: so++,
-            },
-          });
-          stats.certifications += 1;
-        }
-      }
-
-      const skillsPath = pick('skills', 'skill');
-      if (skillsPath) {
-        onProgress('LinkedIn: importing skills', { phase: 'skills' });
-        const seenSkill = new Set();
-        let so = 0;
-        for (const row of recordsFor(skillsPath)) {
-          const n = normalizeKey(row);
-          const name = cell(n, ['name', 'skill', 'title']);
-          if (!name) continue;
-          const key = name.toLowerCase();
-          if (seenSkill.has(key)) continue;
-          seenSkill.add(key);
-          await tx.developerLinkedinSkill.create({
-            data: { developerId, name, sortOrder: so++ },
-          });
-          stats.skills += 1;
-        }
-      }
-
-      const endorsementsPath = pick(
-        'endorsementreceivedinfo',
-        'endorsementsreceivedinfo',
-        'endorsementsinfo',
-        'endorsementsreceived',
-        'receivedendorsements',
-        'endorsements',
-        'endorsement',
-      );
-      if (endorsementsPath) {
-        onProgress('LinkedIn: importing received endorsements', { phase: 'endorsements' });
-        let so = 0;
-        const endorsementRows = recordsFor(endorsementsPath);
-        if (endorsementRows.length === 0) {
-          onProgress('LinkedIn: endorsements file found but empty', {
-            phase: 'endorsements',
-            level: 'warn',
-            file: path.basename(endorsementsPath),
-          });
-        }
-        for (const row of endorsementRows) {
-          const n = normalizeKey(row);
-          const skillName = cell(n, [
-            'skill',
-            'skill name',
-            'endorsement skill',
-            'endorsed skill',
-            'endorsedskills',
-            'name',
-          ]);
-          const endorserFirstName = cell(n, [
-            'first name',
-            'endorser first name',
-            'associate first name',
-            'first_name',
-          ]);
-          const endorserLastName = cell(n, [
-            'last name',
-            'endorser last name',
-            'associate last name',
-            'last_name',
-          ]);
-          const fullName = cell(n, [
-            'associate name',
-            'member name',
-            'endorser',
-            'endorser name',
-            'endorser fullname',
-            'endorser full name',
-          ]);
-          let first = endorserFirstName;
-          let last = endorserLastName;
-          if (!first && !last && fullName) {
-            const parts = fullName.split(/\s+/).filter(Boolean);
-            first = parts[0] ?? null;
-            last = parts.length > 1 ? parts.slice(1).join(' ') : null;
-          }
-          if (!skillName && !first && !last && !fullName) continue;
-          await tx.developerLinkedinReceivedEndorsement.create({
-            data: {
-              developerId,
-              skillName,
-              endorserFirstName: first,
-              endorserLastName: last,
-              endorserCompany: cell(n, ['company', 'endorser company', 'organization']),
-              endorserJobTitle: cell(n, ['job title', 'title', 'position', 'headline', 'occupation']),
-              endorsedOn: cell(n, [
-                'endorsement date',
-                'endorsed on',
-                'date',
-                'connection date',
-                'created',
-                'created at',
-                'timestamp',
-              ]),
-              sortOrder: so++,
-            },
-          });
-          stats.endorsements += 1;
-        }
-      } else {
-        onProgress('LinkedIn: Endorsement_Received_Info.csv not found', {
-          phase: 'endorsements',
-          level: 'warn',
-        });
-      }
-
-      const projectsPath = pick('projects', 'project');
-      if (projectsPath) {
-        onProgress('LinkedIn: importing projects', { phase: 'projects' });
-        let so = 0;
-        for (const row of recordsFor(projectsPath)) {
-          const n = normalizeKey(row);
-          const start = cell(n, ['started on', 'start date']);
-          const end = cell(n, ['finished on', 'end date']);
-          const dates =
-            start || end ? [start, end].filter(Boolean).join(' – ') : cell(n, ['time period']);
-          await tx.project.create({
-            data: {
-              developerId,
-              title: cell(n, ['title', 'name']),
-              description: cell(n, ['description']),
-              url: cell(n, ['url']),
-              dates,
-              source: 'linkedin',
-              sortOrder: so++,
-            },
-          });
-          stats.projects += 1;
-        }
-      }
-
-      const recPath = pick('recommendationsreceived', 'recommendations', 'givenrecommendations');
-      if (recPath) {
-        onProgress('LinkedIn: importing recommendations', { phase: 'recommendations' });
-        let so = 0;
-        for (const row of recordsFor(recPath)) {
-          const n = normalizeKey(row);
-          await tx.developerRecommendation.create({
-            data: {
-              developerId,
-              recommenderFirstName: cell(n, ['first name']),
-              recommenderLastName: cell(n, ['last name']),
-              company: cell(n, ['company']),
-              jobTitle: cell(n, ['job title', 'title']),
-              relationship: cell(n, ['relationship']),
-              text: cell(n, ['recommendation', 'recommendation text', 'text', 'content']),
-              date: cell(n, ['creation date', 'date', 'created']),
-              sortOrder: so++,
-            },
-          });
-          stats.recommendations += 1;
-        }
-      }
-
-      const pubPath = pick('publications', 'publication');
-      if (pubPath) {
-        onProgress('LinkedIn: importing publications', { phase: 'publications' });
-        let so = 0;
-        for (const row of recordsFor(pubPath)) {
-          const n = normalizeKey(row);
-          await tx.developerPublication.create({
-            data: {
-              developerId,
-              title: cell(n, ['name', 'title']),
-              publisher: cell(n, ['publisher']),
-              date: cell(n, ['publication date', 'date']),
-              url: cell(n, ['publication url', 'url']),
-              description: cell(n, ['description', 'summary']),
-              sortOrder: so++,
-            },
-          });
-          stats.publications += 1;
-        }
-      }
-
-      // Courses (courses/course CSVs) have been intentionally removed.
+    const { stats } = await developerPortfolioPersistence.replaceResumeImportSnapshot(developerId, snapshot, {
+      onProgress,
     });
-
-    onProgress('LinkedIn: database import saved', { phase: 'saved' });
 
     return { ok: true, stats };
   } finally {
