@@ -51,7 +51,6 @@ const progressLog = document.getElementById("progressLog");
 const startSyncBtn = document.getElementById("startSyncBtn");
 const saveSetupBtn = document.getElementById("saveSetupBtn");
 const pageTitle = document.getElementById("pageTitle");
-const profileTabBtn = document.getElementById("profileTabBtn");
 const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
 const dashboardCard = document.getElementById("dashboardCard");
@@ -830,11 +829,6 @@ async function refreshStatus() {
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
     setHidden(dataPageCard, !showDataPageCard);
 
-    const showProfileTab = !(
-      showSetup || postSetupAwaitingAuth || !status.authenticated
-    );
-    setHidden(profileTabBtn, !showProfileTab);
-    if (profileTabBtn) profileTabBtn.disabled = !showProfileTab;
     pageTitle.textContent = capitalizePageTitle(
       showSetup
         ? "Initial Setup"
@@ -1150,9 +1144,6 @@ startSyncBtn.addEventListener("click", () => {
   startSync();
 });
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
-profileTabBtn.addEventListener("click", () => {
-  if (statusCache?.authenticated) loadDashboardData();
-});
 
 /** Which sidebar href pathname should appear active for the current URL (includes tab aliases). */
 function sidebarLinkMatchesPath(linkPathname, currentPathname) {
