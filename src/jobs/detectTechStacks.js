@@ -1,6 +1,7 @@
 const axios = require("axios");
 const prisma = require("../db/prisma");
-const { getEnvGithubClient, getRepoContents } = require("../services/githubService");
+const { createGithubClient, getEnvGithubClient, getRepoContents } = require("../services/githubService");
+const { getGithubCredentialsForDeveloper } = require("../services/developerCredentials");
 
 function parseGitHubRepoUrl(repoUrl) {
   // Expected format: https://github.com/{owner}/{repo}[...]
@@ -17,12 +18,13 @@ function round2(n) {
 
 async function detectTechStacks({ onProgress } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
-  const github = getEnvGithubClient();
   const rules = await prisma.techDetectorRule.findMany();
   const developers = await prisma.developer.findMany();
   progress("Detecting tech stacks", { totalDevelopers: developers.length, totalRules: rules.length });
 
   for (const developer of developers) {
+    const creds = await getGithubCredentialsForDeveloper(developer.id);
+    const github = creds?.token ? createGithubClient(creds.token) : getEnvGithubClient();
     const repos = await prisma.repo.findMany({
       where: { developerId: developer.id },
       include: { languages: true },

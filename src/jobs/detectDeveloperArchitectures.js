@@ -1,5 +1,6 @@
 const prisma = require("../db/prisma");
-const { getEnvGithubClient, getRepoTopics, getRepoGitTreeFiles } = require("../services/githubService");
+const { createGithubClient, getEnvGithubClient, getRepoTopics, getRepoGitTreeFiles } = require("../services/githubService");
+const { getGithubCredentialsForDeveloper } = require("../services/developerCredentials");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,7 +60,16 @@ const ARCH_KEYWORDS_LOWER = Object.fromEntries(
 
 async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
-  const github = getEnvGithubClient();
+  const githubCache = new Map();
+  async function githubForRepoDeveloper(developerId) {
+    const key = developerId ?? "__none__";
+    if (githubCache.has(key)) return githubCache.get(key);
+    const creds = developerId != null ? await getGithubCredentialsForDeveloper(developerId) : null;
+    const client = creds?.token ? createGithubClient(creds.token) : getEnvGithubClient();
+    githubCache.set(key, client);
+    return client;
+  }
+
   const repos = await prisma.repo.findMany({
     select: {
       id: true,
@@ -77,6 +87,7 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
 
   for (let idx = 0; idx < repos.length; idx++) {
     const repo = repos[idx];
+    const github = await githubForRepoDeveloper(repo.developerId);
 
     const fullName = repo.fullName || `${repo.name}`; // best-effort
     if (!fullName || !fullName.includes("/")) {

@@ -50,21 +50,20 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 |----------|---------|
 | `PORT` | HTTP port (default `3000`) |
 | `DATABASE_URL` | PostgreSQL connection string |
-| `GITHUB_TOKEN` | GitHub PAT for API access |
-| `GITHUB_USERNAME` | GitHub login used for sync |
-| `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` | OAuth app credentials |
-| `SESSION_SECRET` | Express session signing secret |
-| `GITHUB_OAUTH_CALLBACK_URL` | Optional; defaults to `{origin}/auth/github/callback` |
 
-**Portfolio deploy** (optional):
+**`SESSION_SECRET`:** one secret for the entire server (Express signs all users’ cookies with it). It is **not** per developer. Set it in the process environment, secret manager, or via Initial Setup — not as one row per user in the database.
+
+**GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
+
+Per-developer data is stored on `developers` (see Prisma model comments): GitHub tokens (`githubAccessTokenEnc`, `githubRefreshTokenEnc`), `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`, `githubOauthCallbackUrl`), and deploy fields (`deployRepoUrl`, `deployBranch`, `deployReadmeRemote`, `deployPortfolioAfterSync`).
+
+**Portfolio deploy CLI** (manual runs only):
 
 | Variable | Purpose |
 |----------|---------|
-| `DEPLOY_REPO_URL` | Git URL of the target repo (e.g. profile README repo) |
-| `DEPLOY_README_REMOTE` | Remote name used in the deploy clone (default `readme`) |
-| `DEPLOY_BRANCH` | Branch to push (default `main`) |
-| `DEPLOY_PORTFOLIO_AFTER_SYNC` | Set `1` or `true` to run deploy automatically after a successful sync |
 | `PORTFOLIO_DEVELOPER_ID` | Developer id when using `deploy-portfolio:regen` CLI |
+
+When the app runs deploy after sync, it passes each developer’s deploy fields into the deploy script as process env (not from `.env`).
 
 See `.example.env` for placeholders.
 
@@ -72,7 +71,7 @@ See `.example.env` for placeholders.
 
 | Script | Command |
 |--------|---------|
-| `npm run deploy-portfolio` | Push generated `./portfolio` to `DEPLOY_REPO_URL` |
+| `npm run deploy-portfolio` | Push generated `./portfolio` (repo/branch from env only for manual CLI; production uses DB per developer) |
 | `npm run deploy-portfolio:regen` | Regenerate portfolio from DB, then deploy |
 | `npm run push:origin` | `git push origin HEAD` (this app’s source repo) |
 

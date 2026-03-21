@@ -69,15 +69,7 @@ function buildDatabaseUrl({ dbHost, dbPort, dbUser, dbPassword, dbName }) {
 }
 
 function missingConfigKeys(runtimeEnv = process.env) {
-  const required = [
-    "PORT",
-    "GITHUB_CLIENT_ID",
-    "GITHUB_CLIENT_SECRET",
-    "SESSION_SECRET",
-    "GITHUB_TOKEN",
-    "GITHUB_USERNAME",
-    "DATABASE_URL",
-  ];
+  const required = ["PORT", "SESSION_SECRET", "DATABASE_URL"];
   return required.filter((k) => !String(runtimeEnv[k] ?? "").trim());
 }
 

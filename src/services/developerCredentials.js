@@ -1,25 +1,16 @@
 const prisma = require('../db/prisma');
 const { decryptField } = require('../crypto/fieldEncryption');
+const { createGithubClient } = require('./githubService');
 
 /**
- * @returns {{ token: string, username: string | null } | null}
- */
-function githubFromEnv() {
-  const token = String(process.env.GITHUB_TOKEN ?? '').trim();
-  if (!token) return null;
-  const username = String(process.env.GITHUB_USERNAME ?? '').trim() || null;
-  return { token, username };
-}
-
-/**
- * Resolve GitHub API token and username for sync jobs.
- * Prefers per-developer encrypted token; falls back to global env (single-tenant / dev).
+ * Resolve GitHub API token and username for a developer (encrypted fields on `developers` only).
+ * Do not use global GITHUB_TOKEN / GITHUB_USERNAME — multi-tenant installs store credentials per row.
  * @param {number} developerId
  * @returns {Promise<{ token: string, username: string | null } | null>}
  */
 async function getGithubCredentialsForDeveloper(developerId) {
   if (developerId == null || Number.isNaN(Number(developerId))) {
-    return githubFromEnv();
+    return null;
   }
   const dev = await prisma.developer.findUnique({
     where: { id: developerId },
@@ -32,21 +23,30 @@ async function getGithubCredentialsForDeveloper(developerId) {
   });
   if (!dev) return null;
 
-  if (dev.githubAccessTokenEnc) {
-    try {
-      const token = decryptField(dev.githubAccessTokenEnc);
-      if (!token) return githubFromEnv();
-      const username =
-        (dev.githubUsername && String(dev.githubUsername).trim()) ||
-        (dev.githubLogin && String(dev.githubLogin).trim()) ||
-        null;
-      return { token, username };
-    } catch {
-      return githubFromEnv();
-    }
+  if (!dev.githubAccessTokenEnc) {
+    return null;
   }
+  try {
+    const token = decryptField(dev.githubAccessTokenEnc);
+    if (!token) return null;
+    const username =
+      (dev.githubUsername && String(dev.githubUsername).trim()) ||
+      (dev.githubLogin && String(dev.githubLogin).trim()) ||
+      null;
+    return { token, username };
+  } catch {
+    return null;
+  }
+}
 
-  return githubFromEnv();
+/**
+ * @param {number | null | undefined} developerId
+ * @returns {Promise<import('axios').AxiosInstance | null>}
+ */
+async function getGithubClientForDeveloper(developerId) {
+  const creds = await getGithubCredentialsForDeveloper(developerId);
+  if (!creds?.token) return null;
+  return createGithubClient(creds.token);
 }
 
 /**
@@ -70,6 +70,6 @@ async function saveGithubTokensForDeveloper(developerId, accessToken, refreshTok
 
 module.exports = {
   getGithubCredentialsForDeveloper,
-  githubFromEnv,
+  getGithubClientForDeveloper,
   saveGithubTokensForDeveloper,
 };

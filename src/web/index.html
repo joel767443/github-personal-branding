@@ -86,6 +86,42 @@
           <label><input type="checkbox" id="socialTwitter" /> Twitter</label>
           <label><input type="checkbox" id="socialLinkedin" /> LinkedIn</label>
         </div>
+        <p class="muted">Portfolio deploy (stored per account)</p>
+        <div class="row grid" style="max-width: 640px">
+          <div>
+            <label for="deployRepoUrlInput">Deploy repo URL</label>
+            <input id="deployRepoUrlInput" type="text" placeholder="git@github.com:you/you.git" autocomplete="off" />
+          </div>
+          <div>
+            <label for="deployBranchInput">Branch</label>
+            <input id="deployBranchInput" type="text" placeholder="main" />
+          </div>
+          <div>
+            <label for="deployReadmeRemoteInput">Git remote name</label>
+            <input id="deployReadmeRemoteInput" type="text" placeholder="readme" />
+          </div>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="deployPortfolioAfterSync" /> Deploy portfolio automatically after sync</label>
+        </div>
+        <p class="muted">GitHub OAuth app (optional — use your own app instead of server env)</p>
+        <div class="row grid" style="max-width: 640px">
+          <div>
+            <label for="githubOauthClientIdInput">OAuth Client ID</label>
+            <input id="githubOauthClientIdInput" type="text" autocomplete="off" />
+          </div>
+          <div>
+            <label for="githubOauthCallbackUrlInput">OAuth callback URL</label>
+            <input id="githubOauthCallbackUrlInput" type="url" placeholder="https://your-app/auth/github/callback" autocomplete="off" />
+          </div>
+          <div>
+            <label for="githubOauthClientSecretInput">OAuth Client Secret</label>
+            <input id="githubOauthClientSecretInput" type="password" autocomplete="new-password" placeholder="Leave blank to keep" />
+          </div>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="clearGithubOauthClientSecret" /> Remove stored client secret</label>
+        </div>
         <div class="row">
           <button type="button" id="btnCheckout">Open Stripe checkout</button>
           <button type="button" id="btnPortal">Billing portal</button>
@@ -124,10 +160,13 @@
       <div class="card hidden" id="setupCard">
         <div class="step">Step 1</div>
         <h2>Initial Setup</h2>
+        <div class="row">
+          <div class="muted" style="max-width: 520px">
+            Per-developer GitHub access and deploy targets are stored in the database after users sign in with GitHub or use settings — not in <code>.env</code>.
+          </div>
+        </div>
         <div class="grid">
           <div><label>PORT</label><input id="port" placeholder="3000" value="3000" /></div>
-          <div><label>GitHub Username</label><input id="githubUsername" placeholder="octocat" /></div>
-          <div><label>GitHub Token</label><input id="githubToken" type="password" placeholder="ghp_xxx" /></div>
           <div><label>GitHub OAuth Client ID</label><input id="githubClientId" /></div>
           <div><label>GitHub OAuth Client Secret</label><input id="githubClientSecret" type="password" /></div>
           <div><label>DB Host</label><input id="dbHost" placeholder="localhost" value="localhost" /></div>

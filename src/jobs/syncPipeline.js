@@ -7,11 +7,6 @@ const generatePortfolioOutput = require('./generatePortfolioOutput');
 const { runDeployPortfolioCli } = require('../services/deployPortfolioRunner');
 const { addFrequencyToDate } = require('../services/syncFrequencyHelpers');
 
-function envFlagTrue(name) {
-  const v = String(process.env[name] ?? '').toLowerCase().trim();
-  return v === '1' || v === 'true' || v === 'yes';
-}
-
 /**
  * @param {object} opts
  * @param {number | null} opts.developerId Session developer id (optional before first sync)
@@ -42,12 +37,11 @@ async function executeSyncPipeline({ developerId, onProgress, req }) {
   if (resolvedDeveloperId != null) {
     await generatePortfolioOutput({ developerId: resolvedDeveloperId, onProgress: progress });
 
-    let deploy = envFlagTrue('DEPLOY_PORTFOLIO_AFTER_SYNC');
     const row = await prisma.developer.findUnique({
       where: { id: resolvedDeveloperId },
       select: { deployPortfolioAfterSync: true },
     });
-    if (row) deploy = row.deployPortfolioAfterSync !== false;
+    const deploy = row ? row.deployPortfolioAfterSync !== false : false;
 
     if (deploy) {
       await runDeployPortfolioCli(progress, resolvedDeveloperId);
@@ -75,4 +69,4 @@ async function executeSyncPipeline({ developerId, onProgress, req }) {
   }
 }
 
-module.exports = { executeSyncPipeline, envFlagTrue };
+module.exports = { executeSyncPipeline };

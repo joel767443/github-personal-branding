@@ -21,12 +21,15 @@ async function buildDeployProcessEnv(developerId) {
     select: {
       deployRepoUrl: true,
       deployBranch: true,
+      deployReadmeRemote: true,
       deployPortfolioAfterSync: true,
     },
   });
   if (dev) {
     if (dev.deployRepoUrl) env.DEPLOY_REPO_URL = dev.deployRepoUrl;
     env.DEPLOY_BRANCH = dev.deployBranch || 'main';
+    const remote = String(dev.deployReadmeRemote ?? '').trim() || 'readme';
+    env.DEPLOY_README_REMOTE = remote;
     env.DEPLOY_PORTFOLIO_AFTER_SYNC = dev.deployPortfolioAfterSync !== false ? '1' : '0';
   }
   return env;

@@ -12,16 +12,14 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
   const creds = await getGithubCredentialsForDeveloper(developerId);
   if (!creds?.token) {
     throw new Error(
-      'GitHub token not configured. Sign in with GitHub OAuth or configure GITHUB_TOKEN for single-tenant mode.',
+      'GitHub is not connected for this account. Sign in with GitHub OAuth so your token is stored securely.',
     );
   }
 
   const github = createGithubClient(creds.token);
-  const envUser = String(process.env.GITHUB_USERNAME ?? '').trim();
-  const username =
-    githubUsername ?? creds.username ?? (envUser ? envUser : null);
+  const username = githubUsername ?? creds.username ?? null;
   if (!username) {
-    throw new Error('GitHub username is required for sync (OAuth login or GITHUB_USERNAME)');
+    throw new Error('GitHub username is missing for this developer; reconnect GitHub OAuth.');
   }
 
   progress('Fetching repositories');

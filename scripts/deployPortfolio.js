@@ -6,15 +6,11 @@
  *   node scripts/deployPortfolio.js
  *   node scripts/deployPortfolio.js --regenerate
  *
- * After sync (when DEPLOY_PORTFOLIO_AFTER_SYNC=1): app runs this script
- * (`node scripts/deployPortfolio.js`) after generatePortfolioOutput — no second regeneration.
+ * The API’s deploy runner sets DEPLOY_REPO_URL / DEPLOY_BRANCH / DEPLOY_PORTFOLIO_AFTER_SYNC per developer
+ * from the database (not from a shared `.env`).
  *
- * Env:
- *   DEPLOY_REPO_URL          — default git@github.com:joel767443/joel767443.git (profile README repo)
- *   DEPLOY_README_REMOTE     — remote name in the temp clone; default readme (matches `git remote add readme …`)
- *   DEPLOY_BRANCH            — default main
- *   DEPLOY_PORTFOLIO_AFTER_SYNC — set to 1/true to push from the sync pipeline
- *   PORTFOLIO_DEVELOPER_ID   — developer id when using CLI --regenerate only
+ * Manual CLI only (optional): DEPLOY_REPO_URL, DEPLOY_BRANCH, DEPLOY_README_REMOTE, PORTFOLIO_DEVELOPER_ID.
+ * When invoked from the API, DEPLOY_* values come from the developer row (not from `.env`).
  *
  * Push this service’s own code with `npm run push:origin` (uses remote origin, e.g. github-personal-branding).
  */
@@ -27,7 +23,7 @@ const { spawnSync } = require("child_process");
 const ROOT = path.join(__dirname, "..");
 const PORTFOLIO_DIR = path.join(ROOT, "portfolio");
 
-const DEFAULT_REPO = "git@github.com:joel767443/joel767443.git";
+const DEFAULT_REPO = "";
 const DEFAULT_BRANCH = "main";
 /** Remote name for the README/profile repo clone (not the service repo’s `origin`). */
 const DEFAULT_README_REMOTE = "readme";
@@ -165,12 +161,18 @@ function deployPortfolioFiles(options = {}) {
           else console.log(msg);
         };
   const gitInherit = options.gitInherit !== false;
-  const repoUrl = options.repoUrl || process.env.DEPLOY_REPO_URL || DEFAULT_REPO;
+  const repoUrl = String(options.repoUrl || process.env.DEPLOY_REPO_URL || DEFAULT_REPO).trim();
   const branch = options.branch || process.env.DEPLOY_BRANCH || DEFAULT_BRANCH;
   const readmeRemote =
     options.readmeRemote ||
     process.env.DEPLOY_README_REMOTE ||
     DEFAULT_README_REMOTE;
+
+  if (!repoUrl) {
+    throw new Error(
+      "DEPLOY_REPO_URL is not set. For manual deploy, set it (or pass repoUrl). The API sets it from the developer row when deploy runs after sync.",
+    );
+  }
 
   const tmpBase = fs.mkdtempSync(path.join(os.tmpdir(), "portfolio-deploy-"));
   const cloneDir = path.join(tmpBase, "repo");

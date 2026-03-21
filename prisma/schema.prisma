@@ -37,6 +37,15 @@ model User {
   @@map("users")
 }
 
+/// Per-developer profile and integration settings (replaces per-user values that used to live in `.env`).
+/// Former env → column mapping (multi-tenant):
+/// - GITHUB_TOKEN → github_access_token_enc (encrypted); refresh → github_refresh_token_enc
+/// - GITHUB_USERNAME / login → github_username, github_login
+/// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
+/// - GITHUB_OAUTH_CALLBACK_URL (optional override for BYO) → github_oauth_callback_url
+/// - DEPLOY_REPO_URL → deploy_repo_url; DEPLOY_BRANCH → deploy_branch; DEPLOY_README_REMOTE → deploy_readme_remote
+/// - DEPLOY_PORTFOLIO_AFTER_SYNC → deploy_portfolio_after_sync
+/// Server-only (not per row): SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, Stripe/Redis keys, etc.
 model Developer {
   id            Int       @id @default(autoincrement())
   firstName     String?  @map("first_name")
@@ -62,12 +71,19 @@ model Developer {
   githubAccessTokenEnc  String? @map("github_access_token_enc") @db.Text
   githubRefreshTokenEnc String? @map("github_refresh_token_enc") @db.Text
 
+  /// Optional “bring your own” GitHub OAuth app (when not using server GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET).
+  githubOauthClientId          String? @map("github_oauth_client_id")
+  githubOauthClientSecretEnc   String? @map("github_oauth_client_secret_enc") @db.Text
+  githubOauthCallbackUrl       String? @map("github_oauth_callback_url") @db.Text
+
   syncFrequency        SyncFrequency @default(TWO_DAYS) @map("sync_frequency")
   nextScheduledSyncAt  DateTime? @map("next_scheduled_sync_at")
   lastScheduledSyncAt  DateTime? @map("last_scheduled_sync_at")
 
   deployPortfolioAfterSync Boolean @default(true) @map("deploy_portfolio_after_sync")
   deployBranch              String  @default("main") @map("deploy_branch")
+  /// Remote name for `git clone -o <name>` when pushing the profile README repo (often `readme`)
+  deployReadmeRemote        String  @default("readme") @map("deploy_readme_remote")
   deployRepoUrl             String? @map("deploy_repo_url") @db.Text
 
   stripeCustomerId     String?   @map("stripe_customer_id")

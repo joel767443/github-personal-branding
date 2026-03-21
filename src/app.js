@@ -36,6 +36,11 @@ const { resolveDeveloperFromSession } = require('./services/sessionDeveloperServ
 const { getDashboardAnalytics } = require('./services/dashboardAnalyticsService');
 const prisma = require('./db/prisma');
 const { saveGithubTokensForDeveloper } = require('./services/developerCredentials');
+const {
+  resolveGithubOAuthAppCredentials,
+  isGithubOAuthConfigured,
+} = require('./services/githubOauthAppCredentials');
+const { encryptField } = require('./crypto/fieldEncryption');
 const { assertCanRunPaidJobs } = require('./services/subscriptionAccess');
 const { syncQueue, linkedinQueue, queuesEnabled } = require('./queue/jobQueues');
 const { registerWorkers } = require('./workers/registerWorkers');
@@ -132,9 +137,13 @@ let activeRunId = null;
 let linkedinImportInProgress = false;
 let linkedinImportRunId = null;
 
-function oauthConfigured() {
-  const envSnapshot = { ...process.env, ...readCurrentEnv() };
-  return Boolean(envSnapshot.GITHUB_CLIENT_ID && envSnapshot.GITHUB_CLIENT_SECRET);
+function sanitizeDeveloperForClient(dev) {
+  if (!dev || typeof dev !== 'object') return dev;
+  const { githubOauthClientSecretEnc, ...rest } = dev;
+  return {
+    ...rest,
+    githubOauthClientSecretConfigured: Boolean(githubOauthClientSecretEnc),
+  };
 }
 
 async function runSyncPipeline(req) {
@@ -479,20 +488,30 @@ app.get('/auth/logout', (req, res) => {
   });
 });
 
-app.get('/auth/github', (req, res) => {
-  const envSnapshot = { ...process.env, ...readCurrentEnv() };
-  const clientId = envSnapshot.GITHUB_CLIENT_ID;
-  if (!clientId) return respondError(res, 400, 'Missing config', 'GITHUB_CLIENT_ID is not configured');
+app.get('/auth/github', async (req, res) => {
+  try {
+    req.session.oauthDeveloperId = req.session?.user?.developerId ?? null;
+    const creds = await resolveGithubOAuthAppCredentials(req);
+    if (!creds.clientId) {
+      return respondError(
+        res,
+        400,
+        'Missing config',
+        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET for the server, or add your own OAuth app under account settings after signing in with email.',
+      );
+    }
 
-  const state = crypto.randomBytes(16).toString('hex');
-  req.session.oauthState = state;
-  const callbackUrl = envSnapshot.GITHUB_OAUTH_CALLBACK_URL || `${req.protocol}://${req.get('host')}/auth/github/callback`;
-  const url = new URL('https://github.com/login/oauth/authorize');
-  url.searchParams.set('client_id', clientId);
-  url.searchParams.set('redirect_uri', callbackUrl);
-  url.searchParams.set('scope', 'read:user user:email');
-  url.searchParams.set('state', state);
-  res.redirect(url.toString());
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthState = state;
+    const url = new URL('https://github.com/login/oauth/authorize');
+    url.searchParams.set('client_id', creds.clientId);
+    url.searchParams.set('redirect_uri', creds.callbackUrl);
+    url.searchParams.set('scope', 'read:user user:email');
+    url.searchParams.set('state', state);
+    res.redirect(url.toString());
+  } catch (err) {
+    respondError(res, 500, 'OAuth start failed', err?.message ?? String(err));
+  }
 });
 
 app.get('/auth/github/callback', async (req, res) => {
@@ -502,11 +521,8 @@ app.get('/auth/github/callback', async (req, res) => {
       return respondError(res, 400, 'Invalid OAuth state', 'State mismatch or missing code');
     }
 
-    const envSnapshot = { ...process.env, ...readCurrentEnv() };
-    const clientId = envSnapshot.GITHUB_CLIENT_ID;
-    const clientSecret = envSnapshot.GITHUB_CLIENT_SECRET;
-    const callbackUrl = envSnapshot.GITHUB_OAUTH_CALLBACK_URL || `${req.protocol}://${req.get('host')}/auth/github/callback`;
-    if (!clientId || !clientSecret) {
+    const creds = await resolveGithubOAuthAppCredentials(req);
+    if (!creds.clientId || !creds.clientSecret) {
       return respondError(res, 400, 'Missing config', 'GITHUB OAuth credentials are not configured');
     }
 
@@ -517,10 +533,10 @@ app.get('/auth/github/callback', async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        client_id: clientId,
-        client_secret: clientSecret,
+        client_id: creds.clientId,
+        client_secret: creds.clientSecret,
         code: String(code),
-        redirect_uri: callbackUrl,
+        redirect_uri: creds.callbackUrl,
         state: String(state),
       }),
     });
@@ -686,7 +702,7 @@ app.get('/api/settings/developer', requireLogin, async (req, res) => {
       where: { id: developer.id },
       include: { socialIntegrations: { orderBy: { platform: 'asc' } } },
     });
-    res.json({ ok: true, developer: full });
+    res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
   } catch (err) {
     respondError(res, 500, 'Settings load failed', err?.message ?? String(err));
   }
@@ -705,8 +721,31 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     }
     if (body.deployRepoUrl !== undefined) data.deployRepoUrl = body.deployRepoUrl || null;
     if (body.deployBranch !== undefined) data.deployBranch = String(body.deployBranch || 'main');
+    if (body.deployReadmeRemote !== undefined) {
+      data.deployReadmeRemote = String(body.deployReadmeRemote ?? '').trim() || 'readme';
+    }
     if (body.deployPortfolioAfterSync !== undefined) {
       data.deployPortfolioAfterSync = Boolean(body.deployPortfolioAfterSync);
+    }
+    if (body.githubOauthClientId !== undefined) {
+      data.githubOauthClientId =
+        body.githubOauthClientId == null || String(body.githubOauthClientId).trim() === ''
+          ? null
+          : String(body.githubOauthClientId).trim();
+    }
+    if (body.githubOauthCallbackUrl !== undefined) {
+      data.githubOauthCallbackUrl =
+        body.githubOauthCallbackUrl == null || String(body.githubOauthCallbackUrl).trim() === ''
+          ? null
+          : String(body.githubOauthCallbackUrl).trim();
+    }
+    if (body.clearGithubOauthClientSecret === true) {
+      data.githubOauthClientSecretEnc = null;
+    } else if (body.githubOauthClientSecret !== undefined) {
+      const s = String(body.githubOauthClientSecret ?? '');
+      if (s.trim()) {
+        data.githubOauthClientSecretEnc = encryptField(s);
+      }
     }
     if (body.socialIntegrations && typeof body.socialIntegrations === 'object') {
       for (const [key, enabled] of Object.entries(body.socialIntegrations)) {
@@ -732,7 +771,7 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
       where: { id: developer.id },
       include: { socialIntegrations: true },
     });
-    res.json({ ok: true, developer: full });
+    res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
   } catch (err) {
     respondError(res, 500, 'Settings update failed', err?.message ?? String(err));
   }
@@ -773,7 +812,7 @@ app.get('/setup/status', async (req, res) => {
   const envExistsNow = fs.existsSync(ENV_PATH);
   const envSnapshot = { ...process.env, ...readCurrentEnv() };
   const missing = missingConfigKeys(envSnapshot);
-  const authConfigured = oauthConfigured();
+  const authConfigured = await isGithubOAuthConfigured(req);
   let wizardStep = "setup";
   let syncCompleted = false;
   let linkedinCompleted = false;
@@ -842,8 +881,6 @@ app.post('/setup/submit', async (req, res) => {
   try {
     const {
       port,
-      githubToken,
-      githubUsername,
       githubClientId,
       githubClientSecret,
       dbHost,
@@ -857,8 +894,6 @@ app.post('/setup/submit', async (req, res) => {
     const generatedSessionSecret = crypto.randomBytes(32).toString("hex");
     const updates = {
       PORT: String(port ?? "").trim(),
-      GITHUB_TOKEN: String(githubToken ?? "").trim(),
-      GITHUB_USERNAME: String(githubUsername ?? "").trim(),
       GITHUB_CLIENT_ID: String(githubClientId ?? "").trim(),
       GITHUB_CLIENT_SECRET: String(githubClientSecret ?? "").trim(),
       SESSION_SECRET: generatedSessionSecret,

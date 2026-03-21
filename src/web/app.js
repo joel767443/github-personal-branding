@@ -63,6 +63,14 @@ const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
 const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
+const deployRepoUrlInput = document.getElementById("deployRepoUrlInput");
+const deployBranchInput = document.getElementById("deployBranchInput");
+const deployReadmeRemoteInput = document.getElementById("deployReadmeRemoteInput");
+const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
+const githubOauthClientIdInput = document.getElementById("githubOauthClientIdInput");
+const githubOauthCallbackUrlInput = document.getElementById("githubOauthCallbackUrlInput");
+const githubOauthClientSecretInput = document.getElementById("githubOauthClientSecretInput");
+const clearGithubOauthClientSecret = document.getElementById("clearGithubOauthClientSecret");
 const registerEmail = document.getElementById("registerEmail");
 const registerPassword = document.getElementById("registerPassword");
 const registerBtn = document.getElementById("registerBtn");
@@ -430,6 +438,14 @@ async function loadSettingsForm() {
       const el = map[row.platform];
       if (el) el.checked = Boolean(row.enabled);
     }
+    if (deployRepoUrlInput) deployRepoUrlInput.value = d.deployRepoUrl ?? "";
+    if (deployBranchInput) deployBranchInput.value = d.deployBranch ?? "main";
+    if (deployReadmeRemoteInput) deployReadmeRemoteInput.value = d.deployReadmeRemote ?? "readme";
+    if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
+    if (githubOauthClientIdInput) githubOauthClientIdInput.value = d.githubOauthClientId ?? "";
+    if (githubOauthCallbackUrlInput) githubOauthCallbackUrlInput.value = d.githubOauthCallbackUrl ?? "";
+    if (githubOauthClientSecretInput) githubOauthClientSecretInput.value = "";
+    if (clearGithubOauthClientSecret) clearGithubOauthClientSecret.checked = false;
   } catch (_) {
     /* ignore */
   }
@@ -1056,8 +1072,6 @@ async function submitSetup() {
     setupMsg.textContent = "Saving setup...";
     const payload = {
       port: document.getElementById("port").value,
-      githubToken: document.getElementById("githubToken").value,
-      githubUsername: document.getElementById("githubUsername").value,
       githubClientId: document.getElementById("githubClientId").value,
       githubClientSecret: document.getElementById("githubClientSecret").value,
       dbHost: document.getElementById("dbHost").value,
@@ -1290,6 +1304,17 @@ saveSettingsBtn?.addEventListener("click", async () => {
           TWITTER: Boolean(socialTwitter?.checked),
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },
+        deployRepoUrl: deployRepoUrlInput?.value?.trim() || null,
+        deployBranch: deployBranchInput?.value?.trim() || "main",
+        deployReadmeRemote: deployReadmeRemoteInput?.value?.trim() || "readme",
+        deployPortfolioAfterSync: Boolean(deployPortfolioAfterSync?.checked),
+        githubOauthClientId: githubOauthClientIdInput?.value?.trim() || null,
+        githubOauthCallbackUrl: githubOauthCallbackUrlInput?.value?.trim() || null,
+        ...(clearGithubOauthClientSecret?.checked
+          ? { clearGithubOauthClientSecret: true }
+          : githubOauthClientSecretInput?.value?.trim()
+            ? { githubOauthClientSecret: githubOauthClientSecretInput.value }
+            : {}),
       }),
     });
     if (settingsMsg) settingsMsg.textContent = "Saved.";
