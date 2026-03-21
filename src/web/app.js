@@ -44,6 +44,8 @@ const logoutBtn = document.getElementById("logoutBtn");
 const userMenuButton = document.getElementById("userMenuButton");
 const userMenuDropdown = document.getElementById("userMenuDropdown");
 const syncCard = document.getElementById("syncCard");
+const syncCardMountPostSetup = document.getElementById("syncCardMountPostSetup");
+const syncCardMountProfile = document.getElementById("syncCardMountProfile");
 const syncState = document.getElementById("syncState");
 const progressLog = document.getElementById("progressLog");
 const startSyncBtn = document.getElementById("startSyncBtn");
@@ -52,6 +54,8 @@ const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
 const dashboardCard = document.getElementById("dashboardCard");
 const settingsCard = document.getElementById("settingsCard");
+const settingsCardMountDefault = document.getElementById("settingsCardMountDefault");
+const settingsCardMountProfile = document.getElementById("settingsCardMountProfile");
 const syncFrequencySelect = document.getElementById("syncFrequencySelect");
 const saveSettingsBtn = document.getElementById("saveSettingsBtn");
 const socialFacebook = document.getElementById("socialFacebook");
@@ -707,6 +711,7 @@ async function loadDataPage() {
 
     if (route?.page === "profile") {
       dataPageContent.innerHTML = await getHtml("/views/profile");
+      await loadSettingsForm();
     } else if (route?.page === "experience") {
       dataPageContent.innerHTML = await getHtml(viewsUrl("/views/experience"));
     } else if (route?.page === "projects") {
@@ -927,13 +932,21 @@ async function refreshStatus() {
     setHidden(sidebarEl, hideShell);
     setHidden(topNavEl, hideShell);
 
-    const showDashboardCard = showDashboard && !postSetupAwaitingAuth;
-    setHidden(dashboardCard, !showDashboardCard);
-    setHidden(settingsCard, !showDashboardCard);
-
     const showDataPageCard =
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
     setHidden(dataPageCard, !showDataPageCard);
+
+    const showDashboardCard = showDashboard && !postSetupAwaitingAuth;
+    setHidden(dashboardCard, !showDashboardCard);
+    const showSettingsCard = showDataPageCard && isProfilePage;
+    setHidden(settingsCard, !showSettingsCard);
+    if (settingsCard && settingsCardMountDefault && settingsCardMountProfile) {
+      if (showSettingsCard) {
+        settingsCardMountProfile.appendChild(settingsCard);
+      } else {
+        settingsCardMountDefault.appendChild(settingsCard);
+      }
+    }
 
     pageTitle.textContent = capitalizePageTitle(
       showSetup || showLogin
@@ -957,10 +970,21 @@ async function refreshStatus() {
         setHidden(serverConfigHint, true);
       }
     }
-    // Match dashboard: Step 2 / sync UX only on `/dashboard`, not on Profile or other data routes.
+    // Sync GitHub: on `/profile` during normal flow; on post-setup mount when shell is minimal (before GitHub sign-in).
     const showSyncCard =
-      postSetupAwaitingAuth || (showSync && !forceUploadUi && isDashboardRoute);
+      postSetupAwaitingAuth || (showSync && !forceUploadUi && isProfilePage);
     setHidden(syncCard, !showSyncCard);
+    if (syncCard && syncCardMountPostSetup && syncCardMountProfile) {
+      if (showSyncCard) {
+        if (postSetupAwaitingAuth) {
+          syncCardMountPostSetup.appendChild(syncCard);
+        } else {
+          syncCardMountProfile.appendChild(syncCard);
+        }
+      } else {
+        syncCardMountPostSetup.appendChild(syncCard);
+      }
+    }
     // LinkedIn ZIP upload: always on `/profile`; on `/dashboard` only after GitHub sync (upload step or completed).
     // `forceUploadUi` is reserved for a future `/…` route with `kind: "upload"` (currently unused).
     const showUploadCard =
