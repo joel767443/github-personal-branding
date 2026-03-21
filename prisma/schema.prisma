@@ -45,7 +45,6 @@ model User {
 /// - GITHUB_USERNAME / login → github_username, github_login
 /// - GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET (optional BYO app) → github_oauth_client_id, github_oauth_client_secret_enc
 /// - GITHUB_OAUTH_CALLBACK_URL (optional override for BYO) → github_oauth_callback_url
-/// - DEPLOY_REPO_URL → deploy_repo_url; DEPLOY_BRANCH → deploy_branch; DEPLOY_README_REMOTE → deploy_readme_remote
 /// - DEPLOY_PORTFOLIO_AFTER_SYNC → deploy_portfolio_after_sync
 /// Server-only (not per row): SESSION_SECRET, DATABASE_URL, PORT, ENCRYPTION_MASTER_KEY, Stripe/Redis keys, etc.
 model Developer {
@@ -88,10 +87,6 @@ model Developer {
   lastScheduledSyncAt  DateTime? @map("last_scheduled_sync_at")
 
   deployPortfolioAfterSync Boolean @default(true) @map("deploy_portfolio_after_sync")
-  deployBranch              String  @default("main") @map("deploy_branch")
-  /// Remote name for `git clone -o <name>` when pushing the profile README repo (often `readme`)
-  deployReadmeRemote        String  @default("readme") @map("deploy_readme_remote")
-  deployRepoUrl             String? @map("deploy_repo_url") @db.Text
 
   stripeCustomerId     String?   @map("stripe_customer_id")
   stripeSubscriptionId String?   @map("stripe_subscription_id")

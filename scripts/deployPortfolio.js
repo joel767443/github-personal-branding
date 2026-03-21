@@ -6,11 +6,11 @@
  *   node scripts/deployPortfolio.js
  *   node scripts/deployPortfolio.js --regenerate
  *
- * The API’s deploy runner sets DEPLOY_REPO_URL / DEPLOY_BRANCH / DEPLOY_PORTFOLIO_AFTER_SYNC per developer
- * from the database (not from a shared `.env`).
+ * The API’s deploy runner sets DEPLOY_PORTFOLIO_AFTER_SYNC per developer from the database (not from a shared
+ * `.env`). Set DEPLOY_REPO_URL in the server environment for portfolio deploy. Branch defaults to `main` unless you
+ * set DEPLOY_BRANCH in the environment.
  *
- * Manual CLI only (optional): DEPLOY_REPO_URL, DEPLOY_BRANCH, DEPLOY_README_REMOTE, PORTFOLIO_DEVELOPER_ID.
- * When invoked from the API, DEPLOY_* values come from the developer row (not from `.env`).
+ * Manual CLI (optional): DEPLOY_REPO_URL, DEPLOY_BRANCH, DEPLOY_README_REMOTE, PORTFOLIO_DEVELOPER_ID.
  *
  * Push this service’s own code with `npm run push:origin` (uses remote origin, e.g. github-personal-branding).
  */
@@ -170,7 +170,7 @@ function deployPortfolioFiles(options = {}) {
 
   if (!repoUrl) {
     throw new Error(
-      "DEPLOY_REPO_URL is not set. For manual deploy, set it (or pass repoUrl). The API sets it from the developer row when deploy runs after sync.",
+      "DEPLOY_REPO_URL is not set. Set it in the environment (or pass repoUrl) for portfolio deploy.",
     );
   }
 

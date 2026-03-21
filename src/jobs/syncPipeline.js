@@ -24,15 +24,7 @@ async function executeSyncPipeline({ developerId, onProgress, req }) {
   }
   await detectTechStacks({ onProgress: progress });
 
-  let branch = 'main';
-  if (resolvedDeveloperId != null) {
-    const dev = await prisma.developer.findUnique({
-      where: { id: resolvedDeveloperId },
-      select: { deployBranch: true },
-    });
-    if (dev?.deployBranch) branch = dev.deployBranch;
-  }
-  await detectDeveloperArchitectures({ branch, onProgress: progress });
+  await detectDeveloperArchitectures({ branch: 'main', onProgress: progress });
 
   if (resolvedDeveloperId != null) {
     await generatePortfolioOutput({ developerId: resolvedDeveloperId, onProgress: progress });

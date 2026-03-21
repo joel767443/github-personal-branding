@@ -8,7 +8,6 @@ const crypto = require("crypto");
 const { executeSyncPipeline } = require('./jobs/syncPipeline');
 const detectTechStacks = require('./jobs/detectTechStacks');
 const detectDeveloperArchitectures = require('./jobs/detectDeveloperArchitectures');
-const bcrypt = require('bcryptjs');
 const seedTechDetectorRules = require('./jobs/seedTechDetectorRules');
 const progressBus = require('./config/progressBus');
 const requireLogin = require('./middleware/requireLogin');
@@ -523,7 +522,7 @@ app.get('/auth/github/callback', async (req, res) => {
     }
 
     const creds = await resolveGithubOAuthAppCredentials(req);
-    console.log("creds", creds);
+
     if (!creds.clientId || !creds.clientSecret) {
       return respondError(res, 400, 'Missing config', 'GitHub OAuth client id and client secret are required');
     }
@@ -668,31 +667,6 @@ app.get('/auth/github/callback', async (req, res) => {
   }
 });
 
-app.post('/auth/login', async (req, res) => {
-  try {
-    const rawEmail = String(req.body?.email ?? '').trim();
-    const password = req.body?.password;
-    if (!rawEmail || !password) {
-      return respondError(res, 400, 'Invalid input', 'email and password required');
-    }
-    const user = await prisma.user.findUnique({ where: { email: rawEmail } });
-    if (!user?.passwordHash) {
-      return respondError(res, 401, 'Invalid credentials', 'Wrong email or password');
-    }
-    const ok = await bcrypt.compare(String(password), user.passwordHash);
-    if (!ok) return respondError(res, 401, 'Invalid credentials', 'Wrong email or password');
-    const dev = await prisma.developer.findFirst({ where: { userId: user.id } });
-    req.session.user = {
-      login: rawEmail,
-      email: rawEmail,
-      developerId: dev?.id ?? null,
-    };
-    res.json({ ok: true, developerId: dev?.id ?? null });
-  } catch (err) {
-    respondError(res, 500, 'Login failed', err?.message ?? String(err));
-  }
-});
-
 app.get('/api/settings/developer', requireLogin, async (req, res) => {
   try {
     const { developer } = await resolveDeveloperFromSession(req);
@@ -719,11 +693,6 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     const data = {};
     if (body.syncFrequency != null) {
       data.syncFrequency = parseSyncFrequency(body.syncFrequency);
-    }
-    if (body.deployRepoUrl !== undefined) data.deployRepoUrl = body.deployRepoUrl || null;
-    if (body.deployBranch !== undefined) data.deployBranch = String(body.deployBranch || 'main');
-    if (body.deployReadmeRemote !== undefined) {
-      data.deployReadmeRemote = String(body.deployReadmeRemote ?? '').trim() || 'readme';
     }
     if (body.deployPortfolioAfterSync !== undefined) {
       data.deployPortfolioAfterSync = Boolean(body.deployPortfolioAfterSync);
@@ -883,6 +852,7 @@ app.get('/setup/status', async (req, res) => {
     hasPersonId: false,
   };
   let needsDeveloperCredentials = false;
+  let needsLinkedInCredentials = false;
   try {
     if (missing.length === 0 && req.session?.user) {
       const resolved = await resolveDeveloperFromSession(req);
@@ -900,14 +870,16 @@ app.get('/setup/status', async (req, res) => {
           hasAccessToken: Boolean(row?.linkedinAccessTokenEnc),
           hasPersonId: Boolean(row?.linkedinPersonId && String(row.linkedinPersonId).trim()),
         };
-        needsDeveloperCredentials =
-          !credentialFlags.hasGithubToken ||
-          !credentialFlags.hasAccessToken ||
-          !credentialFlags.hasPersonId;
+        // GitHub token: required after registration before sync (OAuth may have stored it already).
+        needsDeveloperCredentials = !credentialFlags.hasGithubToken;
+        needsLinkedInCredentials =
+          credentialFlags.hasGithubToken &&
+          (!credentialFlags.hasAccessToken || !credentialFlags.hasPersonId);
       }
     }
   } catch {
     needsDeveloperCredentials = false;
+    needsLinkedInCredentials = false;
   }
 
   res.json({
@@ -923,6 +895,7 @@ app.get('/setup/status', async (req, res) => {
     needsSetup: missing.length > 0,
     credentialFlags,
     needsDeveloperCredentials,
+    needsLinkedInCredentials,
     syncInProgress,
     linkedinImportInProgress,
     runId: activeRunId,

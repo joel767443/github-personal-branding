@@ -60,20 +60,10 @@ const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
 const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
-const deployRepoUrlInput = document.getElementById("deployRepoUrlInput");
-const deployBranchInput = document.getElementById("deployBranchInput");
-const deployReadmeRemoteInput = document.getElementById("deployReadmeRemoteInput");
 const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
-const githubOauthClientIdInput = document.getElementById("githubOauthClientIdInput");
-const githubOauthCallbackUrlInput = document.getElementById("githubOauthCallbackUrlInput");
-const githubOauthClientSecretInput = document.getElementById("githubOauthClientSecretInput");
-const clearGithubOauthClientSecret = document.getElementById("clearGithubOauthClientSecret");
 const loginCard = document.getElementById("loginCard");
 const serverConfigHint = document.getElementById("serverConfigHint");
 const authMsg = document.getElementById("authMsg");
-const loginEmail = document.getElementById("loginEmail");
-const loginPassword = document.getElementById("loginPassword");
-const btnLoginSubmit = document.getElementById("btnLoginSubmit");
 const githubLoginBtn = document.getElementById("githubLoginBtn");
 const profileAvatar = document.getElementById("profileAvatar");
 const profileLogin = document.getElementById("profileLogin");
@@ -116,14 +106,14 @@ const dataPageContent = document.getElementById("dataPageContent");
 const POST_SETUP_AWAIT_GITHUB_KEY = "pdbs_await_github_after_setup";
 
 const developerCredentialsGate = document.getElementById("developerCredentialsGate");
-const credGithubTokenRow = document.getElementById("credGithubTokenRow");
-const credAccessTokenRow = document.getElementById("credAccessTokenRow");
-const credPersonIdRow = document.getElementById("credPersonIdRow");
 const credGithubToken = document.getElementById("credGithubToken");
-const credAccessToken = document.getElementById("credAccessToken");
-const credPersonId = document.getElementById("credPersonId");
 const btnSaveCredentials = document.getElementById("btnSaveCredentials");
 const credentialsMsg = document.getElementById("credentialsMsg");
+const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
+const linkedinCredAccessToken = document.getElementById("linkedinCredAccessToken");
+const linkedinCredPersonId = document.getElementById("linkedinCredPersonId");
+const btnSaveLinkedinCredentials = document.getElementById("btnSaveLinkedinCredentials");
+const linkedinCredentialsMsg = document.getElementById("linkedinCredentialsMsg");
 
 let statusCache = null;
 let progressSSE = null;
@@ -443,14 +433,7 @@ async function loadSettingsForm() {
       const el = map[row.platform];
       if (el) el.checked = Boolean(row.enabled);
     }
-    if (deployRepoUrlInput) deployRepoUrlInput.value = d.deployRepoUrl ?? "";
-    if (deployBranchInput) deployBranchInput.value = d.deployBranch ?? "main";
-    if (deployReadmeRemoteInput) deployReadmeRemoteInput.value = d.deployReadmeRemote ?? "readme";
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
-    if (githubOauthClientIdInput) githubOauthClientIdInput.value = d.githubOauthClientId ?? "";
-    if (githubOauthCallbackUrlInput) githubOauthCallbackUrlInput.value = d.githubOauthCallbackUrl ?? "";
-    if (githubOauthClientSecretInput) githubOauthClientSecretInput.value = "";
-    if (clearGithubOauthClientSecret) clearGithubOauthClientSecret.checked = false;
   } catch (_) {
     /* ignore */
   }
@@ -919,12 +902,7 @@ async function refreshStatus() {
       !showLogin &&
       !postSetupAwaitingAuth;
     setHidden(developerCredentialsGate, !credGate);
-    if (credGate && status.credentialFlags) {
-      const cf = status.credentialFlags;
-      if (credGithubTokenRow) setHidden(credGithubTokenRow, Boolean(cf.hasGithubToken));
-      if (credAccessTokenRow) setHidden(credAccessTokenRow, Boolean(cf.hasAccessToken));
-      if (credPersonIdRow) setHidden(credPersonIdRow, Boolean(cf.hasPersonId));
-    } else if (!credGate && credentialsMsg) {
+    if (!credGate && credentialsMsg) {
       credentialsMsg.textContent = "";
     }
 
@@ -996,6 +974,14 @@ async function refreshStatus() {
         (!isDashboardRoute && isProfilePage && (showUploadStep || syncCompleted)));
     setHidden(uploadCard, !showUploadCard);
 
+    const needsLi = Boolean(status.needsLinkedInCredentials);
+    if (linkedinCredentialsSection) {
+      setHidden(linkedinCredentialsSection, !needsLi || !showUploadCard);
+    }
+    if (!needsLi && linkedinCredentialsMsg) {
+      linkedinCredentialsMsg.textContent = "";
+    }
+
     if (!showSetup && status.authenticated) {
       if (topUserAvatar) {
         topUserAvatar.src = status.user?.avatarUrl ?? "";
@@ -1050,6 +1036,9 @@ async function refreshStatus() {
     } else if (!status.authenticated) {
       syncState.textContent = "Login required to start sync";
       startSyncBtn.disabled = true;
+    } else if (status.needsDeveloperCredentials) {
+      syncState.textContent = "Add your GitHub token to start sync";
+      startSyncBtn.disabled = true;
     } else if (status.syncInProgress) {
       syncState.textContent = "Sync running...";
       startSyncBtn.disabled = true;
@@ -1081,7 +1070,11 @@ async function refreshStatus() {
     }
 
     if (uploadLinkedinZipBtn && showUploadCard) {
-      uploadLinkedinZipBtn.disabled = Boolean(status.syncInProgress || status.linkedinImportInProgress);
+      uploadLinkedinZipBtn.disabled = Boolean(
+        status.syncInProgress ||
+          status.linkedinImportInProgress ||
+          status.needsLinkedInCredentials,
+      );
     }
 
     syncSidebarActiveFromPath();
@@ -1222,40 +1215,6 @@ document.addEventListener("click", (ev) => {
   }
 });
 
-async function submitEmailLogin() {
-  if (authMsg) authMsg.textContent = "";
-  const email = String(loginEmail?.value ?? "").trim();
-  const password = loginPassword?.value ?? "";
-  if (!email || !password) {
-    if (authMsg) authMsg.textContent = "Enter email and password.";
-    return;
-  }
-  try {
-    if (btnLoginSubmit) btnLoginSubmit.disabled = true;
-    await getJson("/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-    const u = new URL(window.location.href);
-    if (u.pathname === "/" || u.pathname === "") {
-      u.pathname = "/dashboard";
-      window.history.replaceState(null, "", u.toString());
-    }
-    await refreshStatus();
-  } catch (err) {
-    if (authMsg) authMsg.textContent = err.message || String(err);
-  } finally {
-    if (btnLoginSubmit) btnLoginSubmit.disabled = false;
-  }
-}
-
-btnLoginSubmit?.addEventListener("click", () => submitEmailLogin());
-
-loginPassword?.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") submitEmailLogin();
-});
-
 githubLoginBtn?.addEventListener("click", () => {
   window.location.href = "/auth/github";
 });
@@ -1275,35 +1234,9 @@ startSyncBtn.addEventListener("click", () => {
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
 
 async function submitDeveloperCredentials() {
-  const cf = statusCache?.credentialFlags;
-  if (!cf) return;
-  const payload = {};
-  if (!cf.hasGithubToken) {
-    const v = credGithubToken?.value?.trim();
-    if (!v) {
-      if (credentialsMsg) credentialsMsg.textContent = "GITHUB_TOKEN is required.";
-      return;
-    }
-    payload.githubToken = v;
-  }
-  if (!cf.hasAccessToken) {
-    const v = credAccessToken?.value?.trim();
-    if (!v) {
-      if (credentialsMsg) credentialsMsg.textContent = "ACCESS_TOKEN is required.";
-      return;
-    }
-    payload.accessToken = v;
-  }
-  if (!cf.hasPersonId) {
-    const v = credPersonId?.value?.trim();
-    if (!v) {
-      if (credentialsMsg) credentialsMsg.textContent = "PERSON_ID is required.";
-      return;
-    }
-    payload.personId = v;
-  }
-  if (Object.keys(payload).length === 0) {
-    if (credentialsMsg) credentialsMsg.textContent = "Nothing to save.";
+  const v = credGithubToken?.value?.trim();
+  if (!v) {
+    if (credentialsMsg) credentialsMsg.textContent = "Enter your GitHub personal access token.";
     return;
   }
   if (credentialsMsg) credentialsMsg.textContent = "Saving…";
@@ -1312,12 +1245,10 @@ async function submitDeveloperCredentials() {
     await getJson("/api/settings/developer", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ githubToken: v }),
     });
     if (credentialsMsg) credentialsMsg.textContent = "Saved.";
     if (credGithubToken) credGithubToken.value = "";
-    if (credAccessToken) credAccessToken.value = "";
-    if (credPersonId) credPersonId.value = "";
     await refreshStatus();
   } catch (err) {
     if (credentialsMsg) credentialsMsg.textContent = err.message || String(err);
@@ -1327,6 +1258,38 @@ async function submitDeveloperCredentials() {
 }
 
 btnSaveCredentials?.addEventListener("click", () => submitDeveloperCredentials());
+
+async function submitLinkedinCredentials() {
+  const at = linkedinCredAccessToken?.value?.trim();
+  const pid = linkedinCredPersonId?.value?.trim();
+  if (!at) {
+    if (linkedinCredentialsMsg) linkedinCredentialsMsg.textContent = "ACCESS_TOKEN is required.";
+    return;
+  }
+  if (!pid) {
+    if (linkedinCredentialsMsg) linkedinCredentialsMsg.textContent = "PERSON_ID is required.";
+    return;
+  }
+  if (linkedinCredentialsMsg) linkedinCredentialsMsg.textContent = "Saving…";
+  if (btnSaveLinkedinCredentials) btnSaveLinkedinCredentials.disabled = true;
+  try {
+    await getJson("/api/settings/developer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accessToken: at, personId: pid }),
+    });
+    if (linkedinCredentialsMsg) linkedinCredentialsMsg.textContent = "Saved.";
+    if (linkedinCredAccessToken) linkedinCredAccessToken.value = "";
+    if (linkedinCredPersonId) linkedinCredPersonId.value = "";
+    await refreshStatus();
+  } catch (err) {
+    if (linkedinCredentialsMsg) linkedinCredentialsMsg.textContent = err.message || String(err);
+  } finally {
+    if (btnSaveLinkedinCredentials) btnSaveLinkedinCredentials.disabled = false;
+  }
+}
+
+btnSaveLinkedinCredentials?.addEventListener("click", () => submitLinkedinCredentials());
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;
@@ -1342,17 +1305,7 @@ saveSettingsBtn?.addEventListener("click", async () => {
           TWITTER: Boolean(socialTwitter?.checked),
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },
-        deployRepoUrl: deployRepoUrlInput?.value?.trim() || null,
-        deployBranch: deployBranchInput?.value?.trim() || "main",
-        deployReadmeRemote: deployReadmeRemoteInput?.value?.trim() || "readme",
         deployPortfolioAfterSync: Boolean(deployPortfolioAfterSync?.checked),
-        githubOauthClientId: githubOauthClientIdInput?.value?.trim() || null,
-        githubOauthCallbackUrl: githubOauthCallbackUrlInput?.value?.trim() || null,
-        ...(clearGithubOauthClientSecret?.checked
-          ? { clearGithubOauthClientSecret: true }
-          : githubOauthClientSecretInput?.value?.trim()
-            ? { githubOauthClientSecret: githubOauthClientSecretInput.value }
-            : {}),
       }),
     });
     if (settingsMsg) settingsMsg.textContent = "Saved.";

@@ -86,41 +86,9 @@
           <label><input type="checkbox" id="socialTwitter" /> Twitter</label>
           <label><input type="checkbox" id="socialLinkedin" /> LinkedIn</label>
         </div>
-        <p class="muted">Portfolio deploy (stored per account)</p>
-        <div class="row grid" style="max-width: 640px">
-          <div>
-            <label for="deployRepoUrlInput">Deploy repo URL</label>
-            <input id="deployRepoUrlInput" type="text" placeholder="git@github.com:you/you.git" autocomplete="off" />
-          </div>
-          <div>
-            <label for="deployBranchInput">Branch</label>
-            <input id="deployBranchInput" type="text" placeholder="main" />
-          </div>
-          <div>
-            <label for="deployReadmeRemoteInput">Git remote name</label>
-            <input id="deployReadmeRemoteInput" type="text" placeholder="readme" />
-          </div>
-        </div>
+        <p class="muted">Portfolio deploy</p>
         <div class="row">
           <label><input type="checkbox" id="deployPortfolioAfterSync" /> Deploy portfolio automatically after sync</label>
-        </div>
-        <p class="muted">GitHub OAuth app (optional — use your own app instead of server env)</p>
-        <div class="row grid" style="max-width: 640px">
-          <div>
-            <label for="githubOauthClientIdInput">OAuth Client ID</label>
-            <input id="githubOauthClientIdInput" type="text" autocomplete="off" />
-          </div>
-          <div>
-            <label for="githubOauthCallbackUrlInput">OAuth callback URL</label>
-            <input id="githubOauthCallbackUrlInput" type="url" placeholder="https://your-app/auth/github/callback" autocomplete="off" />
-          </div>
-          <div>
-            <label for="githubOauthClientSecretInput">OAuth Client Secret</label>
-            <input id="githubOauthClientSecretInput" type="password" autocomplete="new-password" placeholder="Leave blank to keep" />
-          </div>
-        </div>
-        <div class="row">
-          <label><input type="checkbox" id="clearGithubOauthClientSecret" /> Remove stored client secret</label>
         </div>
         <div class="row">
           <button type="button" id="btnCheckout">Open Stripe checkout</button>
@@ -144,19 +112,6 @@
           <div class="row">
             <button type="button" id="githubLoginBtn" class="btn-github">Continue with GitHub</button>
           </div>
-          <div class="row auth-divider muted">or</div>
-          <p class="muted auth-intro">Already have a password? Sign in with email.</p>
-          <div class="row auth-field">
-            <label for="loginEmail">Email</label>
-            <input id="loginEmail" type="email" autocomplete="username" />
-          </div>
-          <div class="row auth-field">
-            <label for="loginPassword">Password</label>
-            <input id="loginPassword" type="password" autocomplete="current-password" />
-          </div>
-          <div class="row">
-            <button type="button" id="btnLoginSubmit">Sign in with email</button>
-          </div>
         </div>
         <div id="authMsg" class="muted auth-msg" aria-live="polite"></div>
       </div>
@@ -173,6 +128,24 @@
       <div class="card hidden" id="uploadCard">
         <div id="linkedin-upload" class="hidden"></div>
         <h2>Upload LinkedIn Export</h2>
+        <div id="linkedinCredentialsSection" class="hidden">
+          <p class="muted">
+            Enter your LinkedIn API credentials before uploading the export ZIP. Values are stored on your developer
+            record; the access token is encrypted at rest.
+          </p>
+          <div class="row auth-field">
+            <label for="linkedinCredAccessToken">ACCESS_TOKEN</label>
+            <input id="linkedinCredAccessToken" type="password" autocomplete="off" placeholder="LinkedIn OAuth access token" />
+          </div>
+          <div class="row auth-field">
+            <label for="linkedinCredPersonId">PERSON_ID</label>
+            <input id="linkedinCredPersonId" type="text" autocomplete="off" placeholder="LinkedIn person / member id" />
+          </div>
+          <div class="row">
+            <button type="button" id="btnSaveLinkedinCredentials">Save LinkedIn credentials</button>
+          </div>
+          <div id="linkedinCredentialsMsg" class="muted auth-msg" aria-live="polite"></div>
+        </div>
         <div class="row">
           <span class="muted">GitHub sync is complete. Upload your LinkedIn ZIP export to continue.</span>
         </div>
@@ -200,26 +173,19 @@
       aria-labelledby="credentialsGateTitle"
     >
       <div class="card credentialsGateCard">
-        <h2 id="credentialsGateTitle">Integration credentials</h2>
+        <h2 id="credentialsGateTitle">GitHub credentials</h2>
         <p class="muted">
-          Your account is missing stored values for <code>GITHUB_TOKEN</code>, <code>ACCESS_TOKEN</code>, and
-          <code>PERSON_ID</code>. Enter them here; they are saved on your developer record (GitHub token and LinkedIn
-          access token are encrypted at rest).
+          Add a GitHub <strong>personal access token</strong> so we can sync your public repos. If you signed in with
+          GitHub, this may already be saved. Tokens are encrypted at rest. Create a PAT under GitHub → Settings →
+          Developer settings → Personal access tokens (classic) with <code>repo</code> and <code>read:user</code> as
+          needed.
         </p>
-        <div class="row auth-field" id="credGithubTokenRow">
-          <label for="credGithubToken">GITHUB_TOKEN</label>
-          <input id="credGithubToken" type="password" autocomplete="off" placeholder="GitHub personal access token" />
-        </div>
-        <div class="row auth-field" id="credAccessTokenRow">
-          <label for="credAccessToken">ACCESS_TOKEN</label>
-          <input id="credAccessToken" type="password" autocomplete="off" placeholder="LinkedIn OAuth access token" />
-        </div>
-        <div class="row auth-field" id="credPersonIdRow">
-          <label for="credPersonId">PERSON_ID</label>
-          <input id="credPersonId" type="text" autocomplete="off" placeholder="LinkedIn person / member id" />
+        <div class="row auth-field">
+          <label for="credGithubToken">GitHub token (PAT)</label>
+          <input id="credGithubToken" type="password" autocomplete="off" placeholder="ghp_…" />
         </div>
         <div class="row">
-          <button type="button" id="btnSaveCredentials">Save credentials</button>
+          <button type="button" id="btnSaveCredentials">Save GitHub token</button>
         </div>
         <div id="credentialsMsg" class="muted auth-msg" aria-live="polite"></div>
       </div>
