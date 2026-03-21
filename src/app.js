@@ -41,6 +41,8 @@ const { saveGithubTokensForDeveloper } = require('./services/developerCredential
 const {
   resolveGithubOAuthAppCredentials,
   isGithubOAuthConfigured,
+  mergedEnv,
+  resolveGithubOAuthClientSecretFromEnv,
 } = require('./services/githubOauthAppCredentials');
 const { encryptField } = require('./crypto/fieldEncryption');
 const { assertCanRunPaidJobs } = require('./services/subscriptionAccess');
@@ -495,12 +497,7 @@ app.get('/auth/github', async (req, res) => {
     req.session.oauthDeveloperId = req.session?.user?.developerId ?? null;
     const creds = await resolveGithubOAuthAppCredentials(req);
     if (!creds.clientId) {
-      return respondError(
-        res,
-        400,
-        'Missing config',
-        'GitHub OAuth is not configured. Set GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET for the server, or sign in with email and password, then add your own OAuth app under account settings.',
-      );
+      return res.redirect(302, 'https://github.com/login/oauth/authorize');
     }
 
     const state = crypto.randomBytes(16).toString('hex');
@@ -545,6 +542,13 @@ app.get('/auth/github/callback', async (req, res) => {
     const tokenJson = await tokenResp.json();
     const accessToken = tokenJson.access_token;
     if (!accessToken) {
+      if (tokenJson.error === 'incorrect_client_credentials') {
+        return respondError(res, 400, 'OAuth token exchange failed', {
+          ...tokenJson,
+          hint:
+            'GITHUB_CLIENT_ID must match your OAuth App. Set GITHUB_CLIENT_SECRET to that app’s Client secrets value (GitHub → Settings → Developer settings → OAuth Apps). A personal access token (ghp_...) cannot be used as the OAuth client secret.',
+        });
+      }
       return respondError(res, 400, 'OAuth token exchange failed', tokenJson);
     }
 
@@ -601,19 +605,40 @@ app.get('/auth/github/callback', async (req, res) => {
         })),
         skipDuplicates: true,
       });
-    } else {
-      await prisma.developer.update({
-        where: { id: developer.id },
-        data: {
-          githubLogin: userJson.login,
-          githubUsername: userJson.login,
-          profilePic: userJson.avatar_url ?? undefined,
-        },
-      });
     }
 
     const refreshToken = tokenJson.refresh_token ?? null;
     await saveGithubTokensForDeveloper(developer.id, accessToken, refreshToken);
+
+    await prisma.developer.update({
+      where: { id: developer.id },
+      data: {
+        githubLogin: userJson.login,
+        githubUsername: userJson.login,
+        profilePic: userJson.avatar_url ?? null,
+        firstName: firstName ?? undefined,
+        lastName: lastName ?? undefined,
+      },
+    });
+
+    const m = mergedEnv();
+    const envClientId = String(m.GITHUB_CLIENT_ID ?? '').trim();
+    const envClientSecret = resolveGithubOAuthClientSecretFromEnv(m);
+    if (envClientId && envClientSecret && creds.clientId === envClientId) {
+      const existingOauth = await prisma.developer.findUnique({
+        where: { id: developer.id },
+        select: { githubOauthClientId: true },
+      });
+      if (!existingOauth?.githubOauthClientId) {
+        await prisma.developer.update({
+          where: { id: developer.id },
+          data: {
+            githubOauthClientId: envClientId,
+            githubOauthClientSecretEnc: encryptField(envClientSecret),
+          },
+        });
+      }
+    }
 
     req.session.user = {
       id: userJson.id,

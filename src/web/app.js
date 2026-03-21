@@ -1015,7 +1015,7 @@ async function refreshStatus() {
       if (sidebarName) sidebarName.textContent = status.user?.name ?? status.user?.login ?? "";
       if (sidebarEmail) sidebarEmail.textContent = status.user?.email ?? "";
       if (sidebarPhone) sidebarPhone.textContent = "";
-    } else if (!showSetup && status.authConfigured) {
+    } else if (!showSetup && !status.authenticated) {
       setHidden(userMenuButton, true);
       userMenuDropdown.classList.remove("open");
       setHidden(loginBtn, false);
