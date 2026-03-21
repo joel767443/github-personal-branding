@@ -1,24 +1,41 @@
+const prisma = require('../db/prisma');
+const { getRepos, getCommits, getRepoLanguages, getUserProfile, createGithubClient } = require('../services/githubService');
+const { getGithubCredentialsForDeveloper } = require('../services/developerCredentials');
 const { developerPortfolioPersistence } = require('../persistence/developerPortfolioPersistence');
-const { getRepos, getCommits, getRepoLanguages, getUserProfile } = require('../services/githubService');
 
-async function syncGithub({ onProgress, githubUsername } = {}) {
-  const username = githubUsername ?? process.env.GITHUB_USERNAME;
+/**
+ * @param {{ onProgress?: function, githubUsername?: string, developerId?: number }} opts
+ */
+async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
   const progress = typeof onProgress === 'function' ? onProgress : () => {};
 
-  progress('Getting user details');
-  console.log('Fetching repos...');
+  const creds = await getGithubCredentialsForDeveloper(developerId);
+  if (!creds?.token) {
+    throw new Error(
+      'GitHub token not configured. Sign in with GitHub OAuth or configure GITHUB_TOKEN for single-tenant mode.',
+    );
+  }
+
+  const github = createGithubClient(creds.token);
+  const envUser = String(process.env.GITHUB_USERNAME ?? '').trim();
+  const username =
+    githubUsername ?? creds.username ?? (envUser ? envUser : null);
+  if (!username) {
+    throw new Error('GitHub username is required for sync (OAuth login or GITHUB_USERNAME)');
+  }
 
   progress('Fetching repositories');
-  const repos = await getRepos(username);
+  const repos = await getRepos(github, username);
 
-  const profile = await getUserProfile(username);
+  progress('Getting user details');
+  const profile = await getUserProfile(github, username);
   const email = profile.email ?? `${username}@users.noreply.github.com`;
 
   const nameParts = typeof profile.name === 'string' ? profile.name.split(' ').filter(Boolean) : [];
   const firstName = nameParts[0] ?? profile.login ?? null;
   const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
 
-  const { id: developerId } = await developerPortfolioPersistence.upsertDeveloperForGithubActivity({
+  const { id: developerIdResolved } = await developerPortfolioPersistence.upsertDeveloperForGithubActivity({
     email,
     firstName,
     lastName,
@@ -28,6 +45,20 @@ async function syncGithub({ onProgress, githubUsername } = {}) {
     jobTitle: profile.bio ?? null,
     summaryFromHost: profile.bio ?? null,
     hireable: typeof profile.hireable === 'boolean' ? profile.hireable : null,
+  });
+
+  if (developerId != null && developerIdResolved !== developerId) {
+    console.warn(
+      `syncGithub: resolved developer id ${developerIdResolved} differs from job developerId ${developerId}`,
+    );
+  }
+
+  await prisma.developer.update({
+    where: { id: developerIdResolved },
+    data: {
+      githubLogin: profile.login ?? username,
+      githubUsername: username,
+    },
   });
 
   progress('Saving repositories', { totalRepos: repos.length });
@@ -48,13 +79,13 @@ async function syncGithub({ onProgress, githubUsername } = {}) {
       url: repo.html_url,
       createdAt: new Date(repo.created_at),
       updatedAt: new Date(repo.updated_at),
-      developerId,
+      developerId: developerIdResolved,
     });
 
     console.log(`Synced repo: ${repo.name}`);
 
     try {
-      const langData = await getRepoLanguages(ownerLogin, repo.name);
+      const langData = await getRepoLanguages(github, ownerLogin, repo.name);
       const totalBytes = Object.values(langData).reduce((sum, v) => sum + v, 0);
 
       const languagePercentages = {};
@@ -93,7 +124,7 @@ async function syncGithub({ onProgress, githubUsername } = {}) {
 
     let commits = [];
     try {
-      commits = await getCommits(ownerLogin, repo.name);
+      commits = await getCommits(github, ownerLogin, repo.name);
     } catch (err) {
       const status = err?.response?.status;
       if (status === 403 || status === 404) {
@@ -116,7 +147,7 @@ async function syncGithub({ onProgress, githubUsername } = {}) {
   progress('Repository sync finished', { totalRepos: repos.length });
   console.log('GitHub sync complete');
 
-  return { developerId };
+  return { developerId: developerIdResolved };
 }
 
 module.exports = syncGithub;

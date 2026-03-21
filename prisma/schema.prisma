@@ -11,6 +11,32 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SyncFrequency {
+  TWO_DAYS
+  ONE_WEEK
+  TWO_WEEKS
+  ONE_MONTH
+}
+
+enum SocialPlatform {
+  FACEBOOK
+  TWITTER
+  LINKEDIN
+}
+
+model User {
+  id            Int       @id @default(autoincrement())
+  email         String    @unique
+  passwordHash  String?   @map("password_hash")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  developer Developer?
+
+  @@map("users")
+}
+
 model Developer {
   id            Int       @id @default(autoincrement())
   firstName     String?  @map("first_name")
@@ -26,6 +52,29 @@ model Developer {
   createdAt     DateTime @map("created_at") @default(now())
   updatedAt     DateTime @map("updated_at") @updatedAt
 
+  userId Int? @unique @map("user_id")
+  user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  /// GitHub login from OAuth (for job run correlation)
+  githubLogin   String? @map("github_login")
+  /// Override for API sync; falls back to githubLogin or email-derived handle
+  githubUsername String? @map("github_username")
+  githubAccessTokenEnc  String? @map("github_access_token_enc") @db.Text
+  githubRefreshTokenEnc String? @map("github_refresh_token_enc") @db.Text
+
+  syncFrequency        SyncFrequency @default(TWO_DAYS) @map("sync_frequency")
+  nextScheduledSyncAt  DateTime? @map("next_scheduled_sync_at")
+  lastScheduledSyncAt  DateTime? @map("last_scheduled_sync_at")
+
+  deployPortfolioAfterSync Boolean @default(true) @map("deploy_portfolio_after_sync")
+  deployBranch              String  @default("main") @map("deploy_branch")
+  deployRepoUrl             String? @map("deploy_repo_url") @db.Text
+
+  stripeCustomerId     String?   @map("stripe_customer_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  subscriptionStatus   String?   @map("subscription_status")
+  currentPeriodEnd     DateTime? @map("current_period_end")
+
   repos             Repo[]
   developerTechStack DeveloperTechStack[]
   developerArchitectures DeveloperArchitecture[]
@@ -37,8 +86,24 @@ model Developer {
   developerLinkedinReceivedEndorsements DeveloperLinkedinReceivedEndorsement[]
   developerRecommendations   DeveloperRecommendation[]
   developerPublications     DeveloperPublication[]
+  socialIntegrations DeveloperSocialIntegration[]
 
   @@map("developers")
+}
+
+model DeveloperSocialIntegration {
+  id           Int            @id @default(autoincrement())
+  developerId  Int            @map("developer_id")
+  platform     SocialPlatform
+  enabled      Boolean        @default(false)
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@unique([developerId, platform])
+  @@index([developerId])
+  @@map("developer_social_integrations")
 }
 
 model Repo {

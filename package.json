@@ -18,13 +18,18 @@
     "@prisma/client": "^7.5.0",
     "adm-zip": "^0.5.16",
     "axios": "^1.13.6",
+    "bcryptjs": "^3.0.3",
+    "bullmq": "^5.71.0",
     "csv-parse": "^6.2.0",
     "dotenv": "^17.3.1",
     "ejs": "^5.0.1",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
+    "ioredis": "^5.10.1",
     "multer": "^2.1.1",
+    "node-cron": "^4.2.1",
     "pg": "^8.20.0",
-    "prisma": "^7.5.0"
+    "prisma": "^7.5.0",
+    "stripe": "^20.4.1"
   }
 }

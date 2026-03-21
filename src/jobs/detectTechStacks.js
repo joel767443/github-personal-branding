@@ -1,6 +1,6 @@
 const axios = require("axios");
 const prisma = require("../db/prisma");
-const { getRepoContents } = require("../services/githubService");
+const { getEnvGithubClient, getRepoContents } = require("../services/githubService");
 
 function parseGitHubRepoUrl(repoUrl) {
   // Expected format: https://github.com/{owner}/{repo}[...]
@@ -17,6 +17,7 @@ function round2(n) {
 
 async function detectTechStacks({ onProgress } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
+  const github = getEnvGithubClient();
   const rules = await prisma.techDetectorRule.findMany();
   const developers = await prisma.developer.findMany();
   progress("Detecting tech stacks", { totalDevelopers: developers.length, totalRules: rules.length });
@@ -56,7 +57,7 @@ async function detectTechStacks({ onProgress } = {}) {
 
       let contents = [];
       try {
-        contents = await getRepoContents(parsed.owner, parsed.repo);
+        contents = await getRepoContents(github, parsed.owner, parsed.repo);
       } catch (e) {
         continue; // ignore repo content failures (rate limits, missing perms, etc.)
       }

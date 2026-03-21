@@ -1,5 +1,5 @@
 const prisma = require("../db/prisma");
-const { getRepoTopics, getRepoGitTreeFiles } = require("../services/githubService");
+const { getEnvGithubClient, getRepoTopics, getRepoGitTreeFiles } = require("../services/githubService");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -59,6 +59,7 @@ const ARCH_KEYWORDS_LOWER = Object.fromEntries(
 
 async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
+  const github = getEnvGithubClient();
   const repos = await prisma.repo.findMany({
     select: {
       id: true,
@@ -92,19 +93,19 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
     // Python logic: include repo name, description, topics, and recursive file list.
     let topics = [];
     try {
-      topics = await getRepoTopics(owner, repoName);
+      topics = await getRepoTopics(github, owner, repoName);
     } catch {
       topics = [];
     }
 
     let files = [];
     try {
-      files = await getRepoGitTreeFiles(owner, repoName, branch);
+      files = await getRepoGitTreeFiles(github, owner, repoName, branch);
     } catch {
       // fallback to master if requested main is missing
       if (branch === "main") {
         try {
-          files = await getRepoGitTreeFiles(owner, repoName, "master");
+          files = await getRepoGitTreeFiles(github, owner, repoName, "master");
         } catch {
           files = [];
         }

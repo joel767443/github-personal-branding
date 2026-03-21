@@ -1,16 +1,14 @@
 require('dotenv').config();
 const fs = require("fs");
 const path = require("path");
-const { spawnSync } = require("child_process");
 const express = require('express');
 const multer = require('multer');
 const session = require("express-session");
 const crypto = require("crypto");
-const syncGithub = require('./jobs/syncGithub');
-const aggregatePortfolioLanguages = require('./jobs/aggregatePortfolioLanguages');
+const { executeSyncPipeline } = require('./jobs/syncPipeline');
 const detectTechStacks = require('./jobs/detectTechStacks');
 const detectDeveloperArchitectures = require('./jobs/detectDeveloperArchitectures');
-const generatePortfolioOutput = require('./jobs/generatePortfolioOutput');
+const bcrypt = require('bcryptjs');
 const seedTechDetectorRules = require('./jobs/seedTechDetectorRules');
 const progressBus = require('./config/progressBus');
 const requireLogin = require('./middleware/requireLogin');
@@ -33,37 +31,16 @@ const {
   ENV_PATH,
 } = require('./config/runtimeConfig');
 const { ensureUploadsDir, UPLOADS_DIR, linkedinExportZipPath } = require('./config/uploadsDir');
-const { importLinkedInExport } = require('./services/linkedinImportService');
+const { executeLinkedinImportPipeline } = require('./jobs/linkedinPipeline');
 const { resolveDeveloperFromSession } = require('./services/sessionDeveloperService');
 const { getDashboardAnalytics } = require('./services/dashboardAnalyticsService');
 const prisma = require('./db/prisma');
-
-const REPO_ROOT = path.join(__dirname, '..');
-const DEPLOY_PORTFOLIO_SCRIPT = path.join(REPO_ROOT, 'scripts', 'deployPortfolio.js');
-
-/** Same as `node scripts/deployPortfolio.js` (no --regenerate; portfolio already generated in sync). */
-function runDeployPortfolioCli(onProgress) {
-  const r = spawnSync(process.execPath, [DEPLOY_PORTFOLIO_SCRIPT], {
-    cwd: REPO_ROOT,
-    env: process.env,
-    encoding: 'utf8',
-    maxBuffer: 10 * 1024 * 1024,
-  });
-  const combined = [r.stdout, r.stderr].filter(Boolean).join('\n');
-  for (const line of combined.split(/\r?\n/)) {
-    const t = line.trim();
-    if (t) onProgress(t);
-  }
-  if (r.status !== 0) {
-    const msg =
-      r.stderr?.trim() ||
-      r.stdout?.trim() ||
-      `deployPortfolio.js exited with code ${r.status}`;
-    const err = new Error(msg);
-    err.status = r.status;
-    throw err;
-  }
-}
+const { saveGithubTokensForDeveloper } = require('./services/developerCredentials');
+const { assertCanRunPaidJobs } = require('./services/subscriptionAccess');
+const { syncQueue, linkedinQueue, queuesEnabled } = require('./queue/jobQueues');
+const { registerWorkers } = require('./workers/registerWorkers');
+const stripeService = require('./services/stripeService');
+const { parseSyncFrequency } = require('./services/syncFrequencyHelpers');
 
 function envFlagTrue(name) {
   const v = String(process.env[name] ?? '').toLowerCase().trim();
@@ -71,6 +48,25 @@ function envFlagTrue(name) {
 }
 
 const app = express();
+app.post(
+  '/webhooks/stripe',
+  express.raw({ type: 'application/json' }),
+  async (req, res) => {
+    const stripe = stripeService.getStripe();
+    const secret = process.env.STRIPE_WEBHOOK_SECRET;
+    if (!stripe || !secret) {
+      return res.status(500).send('Stripe webhook not configured');
+    }
+    try {
+      const sig = req.headers['stripe-signature'];
+      const event = stripe.webhooks.constructEvent(req.body, sig, secret);
+      await stripeService.handleSubscriptionWebhook(event);
+      res.json({ received: true });
+    } catch (err) {
+      res.status(400).send(`Webhook Error: ${err?.message ?? err}`);
+    }
+  },
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 // MVC view layer: render EJS fragments under `src/views/`.
@@ -145,20 +141,53 @@ async function runSyncPipeline(req) {
   if (linkedinImportInProgress) {
     return { started: false, reason: 'linkedin_import_running', runId: linkedinImportRunId };
   }
+  const resolved = req ? await resolveDeveloperFromSession(req) : { developer: null, login: null };
+  const developerId = resolved?.developer?.id ?? null;
+  try {
+    await assertCanRunPaidJobs(developerId);
+  } catch (subErr) {
+    return {
+      started: false,
+      reason: 'subscription',
+      message: subErr?.message ?? String(subErr),
+    };
+  }
+
+  if (queuesEnabled()) {
+    const runId = `run_${Date.now()}`;
+    activeRunId = runId;
+    await startJobRun({
+      runId,
+      jobType: 'sync',
+      userLogin: resolved?.login ?? null,
+      developerId,
+    });
+    await addJobEvent({ runId, label: 'Sync started', payload: { job: 'sync', queued: true } });
+    await syncQueue.add(
+      'sync',
+      {
+        runId,
+        developerId,
+        userLogin: resolved?.login ?? null,
+      },
+      { jobId: runId },
+    );
+    return { started: true, runId, queued: true };
+  }
+
   if (syncInProgress) return { started: false, reason: 'already_running', runId: activeRunId };
 
   const runId = `run_${Date.now()}`;
   syncInProgress = true;
   activeRunId = runId;
   progressBus.start(runId, { job: 'sync', label: 'Sync started' });
-  const resolved = req ? await resolveDeveloperFromSession(req) : { developer: null, login: null };
   await startJobRun({
     runId,
     jobType: 'sync',
     userLogin: resolved?.login ?? null,
-    developerId: resolved?.developer?.id ?? null,
+    developerId,
   });
-  await addJobEvent({ runId, label: "Sync started", payload: { job: "sync" } });
+  await addJobEvent({ runId, label: 'Sync started', payload: { job: 'sync' } });
 
   const onProgress = (label, extra) => {
     progressBus.publish(label, extra);
@@ -167,33 +196,11 @@ async function runSyncPipeline(req) {
 
   (async () => {
     try {
-      const syncResult = await syncGithub({ onProgress });
-      const developerId = syncResult?.developerId ?? null;
-      if (developerId != null) {
-        await aggregatePortfolioLanguages({ developerId, onProgress });
-      }
-      await detectTechStacks({ onProgress });
-      await detectDeveloperArchitectures({ branch: "main", onProgress });
-      if (developerId != null) {
-        await generatePortfolioOutput({ developerId, onProgress });
-        if (envFlagTrue('DEPLOY_PORTFOLIO_AFTER_SYNC')) {
-          try {
-            runDeployPortfolioCli(onProgress);
-          } catch (deployErr) {
-            const msg = deployErr?.message ?? String(deployErr);
-            onProgress('Portfolio deploy failed', { error: msg });
-            await addJobEvent({
-              runId,
-              label: 'Portfolio deploy failed',
-              payload: { message: msg },
-            }).catch(() => {});
-          }
-        }
-      }
-      if (req?.session) {
-        req.session.wizardStep = "upload";
-        await new Promise((resolve) => req.session.save(() => resolve()));
-      }
+      await executeSyncPipeline({
+        developerId,
+        onProgress,
+        req,
+      });
       progressBus.finish(true);
       await completeJobRun({ runId, summary: 'Sync pipeline complete' });
     } catch (err) {
@@ -547,17 +554,215 @@ app.get('/auth/github/callback', async (req, res) => {
 
     const emailFallback = userJson?.login ? `${userJson.login}@users.noreply.github.com` : null;
     const email = emailFromGitHub ?? emailFallback;
+    if (!email) {
+      return respondError(res, 400, 'No email', 'GitHub did not return an email for this account');
+    }
+
+    let developer = await prisma.developer.findUnique({ where: { email } });
+    const nameParts = typeof userJson.name === 'string' ? userJson.name.split(' ').filter(Boolean) : [];
+    const firstName = nameParts[0] ?? userJson.login ?? null;
+    const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;
+
+    if (!developer) {
+      developer = await prisma.developer.create({
+        data: {
+          email,
+          firstName,
+          lastName,
+          profilePic: userJson.avatar_url ?? null,
+          githubLogin: userJson.login,
+          githubUsername: userJson.login,
+          subscriptionStatus: 'trialing',
+        },
+      });
+      await prisma.developerSocialIntegration.createMany({
+        data: ['FACEBOOK', 'TWITTER', 'LINKEDIN'].map((platform) => ({
+          developerId: developer.id,
+          platform,
+          enabled: false,
+        })),
+        skipDuplicates: true,
+      });
+    } else {
+      await prisma.developer.update({
+        where: { id: developer.id },
+        data: {
+          githubLogin: userJson.login,
+          githubUsername: userJson.login,
+          profilePic: userJson.avatar_url ?? undefined,
+        },
+      });
+    }
+
+    const refreshToken = tokenJson.refresh_token ?? null;
+    await saveGithubTokensForDeveloper(developer.id, accessToken, refreshToken);
+
     req.session.user = {
       id: userJson.id,
       login: userJson.login,
       name: userJson.name,
       avatarUrl: userJson.avatar_url,
       email,
+      developerId: developer.id,
     };
     delete req.session.oauthState;
     res.redirect('/dashboard');
   } catch (err) {
     respondError(res, 500, 'OAuth callback failed', err?.message ?? String(err));
+  }
+});
+
+app.post('/auth/register', async (req, res) => {
+  try {
+    const rawEmail = String(req.body?.email ?? '').trim();
+    const password = req.body?.password;
+    if (!rawEmail || !password) {
+      return respondError(res, 400, 'Invalid input', 'email and password required');
+    }
+    const existing = await prisma.user.findUnique({ where: { email: rawEmail } });
+    if (existing) return respondError(res, 409, 'Exists', 'Email already registered');
+    const passwordHash = await bcrypt.hash(String(password), 12);
+    const user = await prisma.user.create({
+      data: { email: rawEmail, passwordHash },
+    });
+    const dev = await prisma.developer.create({
+      data: {
+        email: rawEmail,
+        userId: user.id,
+        subscriptionStatus: 'trialing',
+      },
+    });
+    await prisma.developerSocialIntegration.createMany({
+      data: ['FACEBOOK', 'TWITTER', 'LINKEDIN'].map((platform) => ({
+        developerId: dev.id,
+        platform,
+        enabled: false,
+      })),
+      skipDuplicates: true,
+    });
+    req.session.user = {
+      login: rawEmail,
+      email: rawEmail,
+      developerId: dev.id,
+    };
+    res.json({ ok: true, developerId: dev.id });
+  } catch (err) {
+    respondError(res, 500, 'Registration failed', err?.message ?? String(err));
+  }
+});
+
+app.post('/auth/login', async (req, res) => {
+  try {
+    const rawEmail = String(req.body?.email ?? '').trim();
+    const password = req.body?.password;
+    if (!rawEmail || !password) {
+      return respondError(res, 400, 'Invalid input', 'email and password required');
+    }
+    const user = await prisma.user.findUnique({ where: { email: rawEmail } });
+    if (!user?.passwordHash) {
+      return respondError(res, 401, 'Invalid credentials', 'Wrong email or password');
+    }
+    const ok = await bcrypt.compare(String(password), user.passwordHash);
+    if (!ok) return respondError(res, 401, 'Invalid credentials', 'Wrong email or password');
+    const dev = await prisma.developer.findFirst({ where: { userId: user.id } });
+    req.session.user = {
+      login: rawEmail,
+      email: rawEmail,
+      developerId: dev?.id ?? null,
+    };
+    res.json({ ok: true, developerId: dev?.id ?? null });
+  } catch (err) {
+    respondError(res, 500, 'Login failed', err?.message ?? String(err));
+  }
+});
+
+app.get('/api/settings/developer', requireLogin, async (req, res) => {
+  try {
+    const { developer } = await resolveDeveloperFromSession(req);
+    if (!developer) {
+      return respondError(res, 404, 'No developer record', 'Complete GitHub sign-in or registration first');
+    }
+    const full = await prisma.developer.findUnique({
+      where: { id: developer.id },
+      include: { socialIntegrations: { orderBy: { platform: 'asc' } } },
+    });
+    res.json({ ok: true, developer: full });
+  } catch (err) {
+    respondError(res, 500, 'Settings load failed', err?.message ?? String(err));
+  }
+});
+
+app.patch('/api/settings/developer', requireLogin, async (req, res) => {
+  try {
+    const { developer } = await resolveDeveloperFromSession(req);
+    if (!developer) {
+      return respondError(res, 404, 'No developer record', 'Complete GitHub sign-in or registration first');
+    }
+    const body = req.body ?? {};
+    const data = {};
+    if (body.syncFrequency != null) {
+      data.syncFrequency = parseSyncFrequency(body.syncFrequency);
+    }
+    if (body.deployRepoUrl !== undefined) data.deployRepoUrl = body.deployRepoUrl || null;
+    if (body.deployBranch !== undefined) data.deployBranch = String(body.deployBranch || 'main');
+    if (body.deployPortfolioAfterSync !== undefined) {
+      data.deployPortfolioAfterSync = Boolean(body.deployPortfolioAfterSync);
+    }
+    if (body.socialIntegrations && typeof body.socialIntegrations === 'object') {
+      for (const [key, enabled] of Object.entries(body.socialIntegrations)) {
+        const platform = String(key).toUpperCase();
+        if (!['FACEBOOK', 'TWITTER', 'LINKEDIN'].includes(platform)) continue;
+        await prisma.developerSocialIntegration.upsert({
+          where: {
+            developerId_platform: { developerId: developer.id, platform },
+          },
+          create: {
+            developerId: developer.id,
+            platform,
+            enabled: Boolean(enabled),
+          },
+          update: { enabled: Boolean(enabled) },
+        });
+      }
+    }
+    if (Object.keys(data).length) {
+      await prisma.developer.update({ where: { id: developer.id }, data });
+    }
+    const full = await prisma.developer.findUnique({
+      where: { id: developer.id },
+      include: { socialIntegrations: true },
+    });
+    res.json({ ok: true, developer: full });
+  } catch (err) {
+    respondError(res, 500, 'Settings update failed', err?.message ?? String(err));
+  }
+});
+
+app.post('/api/billing/checkout', requireLogin, async (req, res) => {
+  try {
+    const { developer } = await resolveDeveloperFromSession(req);
+    if (!developer) {
+      return respondError(res, 404, 'No developer record', 'Create a profile first');
+    }
+    const email = req.session?.user?.email;
+    if (!email) return respondError(res, 400, 'Missing email', '');
+    const { url } = await stripeService.createCheckoutSessionForDeveloper(developer.id, email);
+    res.json({ ok: true, url });
+  } catch (err) {
+    respondError(res, 500, 'Checkout failed', err?.message ?? String(err));
+  }
+});
+
+app.post('/api/billing/portal', requireLogin, async (req, res) => {
+  try {
+    const { developer } = await resolveDeveloperFromSession(req);
+    if (!developer) {
+      return respondError(res, 404, 'No developer record', '');
+    }
+    const { url } = await stripeService.createBillingPortalSession(developer.id);
+    res.json({ ok: true, url });
+  } catch (err) {
+    respondError(res, 500, 'Portal failed', err?.message ?? String(err));
   }
 });
 
@@ -680,13 +885,18 @@ app.post('/setup/submit', async (req, res) => {
 app.post('/sync/start', requireLogin, async (req, res) => {
   const started = await runSyncPipeline(req);
   if (!started.started) {
+    if (started.reason === 'subscription') {
+      return respondError(res, 402, 'Subscription required', started.message ?? 'Payment required');
+    }
     const details =
       started.reason === 'linkedin_import_running'
         ? 'LinkedIn import is still running'
-        : 'A sync is already running';
+        : started.reason === 'already_running'
+          ? 'A sync is already running'
+          : 'Unable to start sync';
     return respondError(res, 409, 'Busy', { runId: started.runId, reason: started.reason, details });
   }
-  res.json({ ok: true, runId: started.runId });
+  res.json({ ok: true, runId: started.runId, queued: Boolean(started.queued) });
 });
 
 app.get('/sync/progress', requireLogin, (req, res) => {
@@ -721,10 +931,10 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
       return respondError(res, 400, "No file", "Select a LinkedIn export ZIP file");
     }
 
-    if (syncInProgress) {
+    if (!queuesEnabled() && syncInProgress) {
       return respondError(res, 409, "Busy", "GitHub sync is running; wait for it to finish");
     }
-    if (linkedinImportInProgress) {
+    if (!queuesEnabled() && linkedinImportInProgress) {
       return respondError(res, 409, "Busy", "LinkedIn import is already running");
     }
 
@@ -743,7 +953,46 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
         );
       }
 
+      try {
+        await assertCanRunPaidJobs(developer.id);
+      } catch (subErr) {
+        return respondError(res, 402, "Subscription required", subErr?.message ?? String(subErr));
+      }
+
       const runId = `linkedin_${Date.now()}`;
+      const fileBuffer = req.file.buffer;
+      const developerId = developer.id;
+      const originalName = req.file.originalname;
+      const fileSize = req.file.size;
+      const dest = linkedinExportZipPath(developerId);
+
+      fs.writeFileSync(dest, fileBuffer);
+
+      if (queuesEnabled()) {
+        linkedinImportRunId = runId;
+        await startJobRun({
+          runId,
+          jobType: "linkedin",
+          userLogin: login ?? null,
+          developerId,
+        });
+        await addJobEvent({ runId, label: "LinkedIn import queued", payload: { job: "linkedin" } });
+        await linkedinQueue.add(
+          "linkedin",
+          { runId, developerId, zipPath: dest },
+          { jobId: runId },
+        );
+        return res.json({
+          ok: true,
+          runId,
+          started: true,
+          queued: true,
+          originalName,
+          size: fileSize,
+          filename: path.basename(dest),
+        });
+      }
+
       linkedinImportInProgress = true;
       linkedinImportRunId = runId;
       progressBus.start(runId, { job: "linkedin", label: "LinkedIn import started" });
@@ -751,15 +1000,9 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
         runId,
         jobType: "linkedin",
         userLogin: login ?? null,
-        developerId: developer.id,
+        developerId,
       });
       await addJobEvent({ runId, label: "LinkedIn import started", payload: { job: "linkedin" } });
-
-      const fileBuffer = req.file.buffer;
-      const developerId = developer.id;
-      const originalName = req.file.originalname;
-      const fileSize = req.file.size;
-      const dest = linkedinExportZipPath(developerId);
 
       res.json({
         ok: true,
@@ -777,17 +1020,11 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
 
       (async () => {
         try {
-          onProgress("LinkedIn: saving ZIP to disk", { phase: "save" });
-          fs.writeFileSync(dest, fileBuffer);
-          const importResult = await importLinkedInExport({
+          const importResult = await executeLinkedinImportPipeline({
             zipPath: dest,
             developerId,
             onProgress,
           });
-          onProgress("LinkedIn: aggregating portfolio languages from GitHub repos", {
-            phase: "aggregate",
-          });
-          await aggregatePortfolioLanguages({ developerId, onProgress });
           progressBus.finish(true, null, {
             job: "linkedin",
             import: importResult.stats,
@@ -1157,6 +1394,8 @@ async function startServer() {
   } catch (err) {
     console.error('Tech detector rule seeding failed:', err?.message ?? String(err));
   }
+
+  registerWorkers();
 
   const server = app.listen(port, () => {
     console.log(`Server running on port ${port}`);

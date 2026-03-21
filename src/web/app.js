@@ -54,6 +54,21 @@ const pageTitle = document.getElementById("pageTitle");
 const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
 const dashboardCard = document.getElementById("dashboardCard");
+const settingsCard = document.getElementById("settingsCard");
+const syncFrequencySelect = document.getElementById("syncFrequencySelect");
+const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+const socialFacebook = document.getElementById("socialFacebook");
+const socialTwitter = document.getElementById("socialTwitter");
+const socialLinkedin = document.getElementById("socialLinkedin");
+const btnCheckout = document.getElementById("btnCheckout");
+const btnPortal = document.getElementById("btnPortal");
+const settingsMsg = document.getElementById("settingsMsg");
+const registerEmail = document.getElementById("registerEmail");
+const registerPassword = document.getElementById("registerPassword");
+const registerBtn = document.getElementById("registerBtn");
+const loginEmailField = document.getElementById("loginEmailField");
+const loginPasswordField = document.getElementById("loginPasswordField");
+const emailLoginBtn = document.getElementById("emailLoginBtn");
 const loginCard = document.getElementById("loginCard");
 const loginPageBtn = document.getElementById("loginPageBtn");
 const loginMsg = document.getElementById("loginMsg");
@@ -403,6 +418,23 @@ function clearDashboard() {
   if (statLastJobStatus) statLastJobStatus.textContent = "";
 }
 
+async function loadSettingsForm() {
+  if (!syncFrequencySelect) return;
+  try {
+    const data = await getJsonOptional("/api/settings/developer");
+    const d = data?.developer;
+    if (!d) return;
+    syncFrequencySelect.value = d.syncFrequency || "TWO_DAYS";
+    const map = { FACEBOOK: socialFacebook, TWITTER: socialTwitter, LINKEDIN: socialLinkedin };
+    for (const row of d.socialIntegrations ?? []) {
+      const el = map[row.platform];
+      if (el) el.checked = Boolean(row.enabled);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 async function loadDashboardData() {
   if (dashboardLoading) return;
   dashboardLoading = true;
@@ -460,6 +492,8 @@ async function loadDashboardData() {
     }
 
     renderDashboardCharts(analytics);
+
+    await loadSettingsForm();
 
     // Sidebar profile (Gentelella-like)
     if (sidebarAvatar) {
@@ -884,6 +918,7 @@ async function refreshStatus() {
 
     const showDashboardCard = showDashboard && !postSetupAwaitingAuth;
     setHidden(dashboardCard, !showDashboardCard);
+    setHidden(settingsCard, !showDashboardCard);
 
     const showDataPageCard =
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
@@ -1204,6 +1239,84 @@ startSyncBtn.addEventListener("click", () => {
   startSync();
 });
 uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
+
+registerBtn?.addEventListener("click", async () => {
+  if (!registerEmail || !registerPassword) return;
+  try {
+    const out = await getJson("/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: registerEmail.value,
+        password: registerPassword.value,
+      }),
+    });
+    if (loginMsg) loginMsg.textContent = "Registered. You can continue.";
+    await refreshStatus();
+  } catch (err) {
+    if (loginMsg) loginMsg.textContent = err.message || String(err);
+  }
+});
+
+emailLoginBtn?.addEventListener("click", async () => {
+  if (!loginEmailField || !loginPasswordField) return;
+  try {
+    await getJson("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: loginEmailField.value,
+        password: loginPasswordField.value,
+      }),
+    });
+    if (loginMsg) loginMsg.textContent = "Signed in.";
+    await refreshStatus();
+  } catch (err) {
+    if (loginMsg) loginMsg.textContent = err.message || String(err);
+  }
+});
+
+saveSettingsBtn?.addEventListener("click", async () => {
+  if (!syncFrequencySelect) return;
+  if (settingsMsg) settingsMsg.textContent = "Saving…";
+  try {
+    await getJson("/api/settings/developer", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        syncFrequency: syncFrequencySelect.value,
+        socialIntegrations: {
+          FACEBOOK: Boolean(socialFacebook?.checked),
+          TWITTER: Boolean(socialTwitter?.checked),
+          LINKEDIN: Boolean(socialLinkedin?.checked),
+        },
+      }),
+    });
+    if (settingsMsg) settingsMsg.textContent = "Saved.";
+  } catch (err) {
+    if (settingsMsg) settingsMsg.textContent = err.message || String(err);
+  }
+});
+
+btnCheckout?.addEventListener("click", async () => {
+  if (settingsMsg) settingsMsg.textContent = "Opening checkout…";
+  try {
+    const out = await getJson("/api/billing/checkout", { method: "POST" });
+    if (out.url) window.location.href = out.url;
+  } catch (err) {
+    if (settingsMsg) settingsMsg.textContent = err.message || String(err);
+  }
+});
+
+btnPortal?.addEventListener("click", async () => {
+  if (settingsMsg) settingsMsg.textContent = "Opening portal…";
+  try {
+    const out = await getJson("/api/billing/portal", { method: "POST" });
+    if (out.url) window.location.href = out.url;
+  } catch (err) {
+    if (settingsMsg) settingsMsg.textContent = err.message || String(err);
+  }
+});
 
 /** Which sidebar href pathname should appear active for the current URL (includes tab aliases). */
 function sidebarLinkMatchesPath(linkPathname, currentPathname) {
