@@ -735,9 +735,7 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
       const p = String(body.personId ?? '').trim();
       data.linkedinPersonId = p || null;
     }
-    if (body.clearGithubPat === true) {
-      data.githubPatEnc = null;
-    } else if (body.githubPat !== undefined) {
+    if (body.githubPat !== undefined) {
       const g = String(body.githubPat ?? '');
       if (g.trim()) {
         data.githubPatEnc = encryptField(g);

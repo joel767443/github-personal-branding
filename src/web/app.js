@@ -64,7 +64,6 @@ const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSy
 const githubPatInput = document.getElementById("githubPatInput");
 const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
 const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
-const btnClearGithubPat = document.getElementById("btnClearGithubPat");
 const githubPatMsg = document.getElementById("githubPatMsg");
 const loginCard = document.getElementById("loginCard");
 const serverConfigHint = document.getElementById("serverConfigHint");
@@ -1264,12 +1263,11 @@ btnSaveLinkedinCredentials?.addEventListener("click", () => submitLinkedinCreden
 async function submitGithubPat() {
   const t = githubPatInput?.value?.trim();
   if (!t) {
-    if (githubPatMsg) githubPatMsg.textContent = "Enter a GitHub personal access token (or use Remove).";
+    if (githubPatMsg) githubPatMsg.textContent = "Enter a GitHub personal access token.";
     return;
   }
   if (githubPatMsg) githubPatMsg.textContent = "Saving…";
   if (btnSaveGithubPat) btnSaveGithubPat.disabled = true;
-  if (btnClearGithubPat) btnClearGithubPat.disabled = true;
   try {
     await getJson("/api/settings/developer", {
       method: "PATCH",
@@ -1284,34 +1282,10 @@ async function submitGithubPat() {
     if (githubPatMsg) githubPatMsg.textContent = err.message || String(err);
   } finally {
     if (btnSaveGithubPat) btnSaveGithubPat.disabled = false;
-    if (btnClearGithubPat) btnClearGithubPat.disabled = false;
-  }
-}
-
-async function clearGithubPat() {
-  if (githubPatMsg) githubPatMsg.textContent = "Removing…";
-  if (btnSaveGithubPat) btnSaveGithubPat.disabled = true;
-  if (btnClearGithubPat) btnClearGithubPat.disabled = true;
-  try {
-    await getJson("/api/settings/developer", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ clearGithubPat: true }),
-    });
-    if (githubPatMsg) githubPatMsg.textContent = "Removed.";
-    if (githubPatInput) githubPatInput.value = "";
-    await loadSettingsForm();
-    await refreshStatus();
-  } catch (err) {
-    if (githubPatMsg) githubPatMsg.textContent = err.message || String(err);
-  } finally {
-    if (btnSaveGithubPat) btnSaveGithubPat.disabled = false;
-    if (btnClearGithubPat) btnClearGithubPat.disabled = false;
   }
 }
 
 btnSaveGithubPat?.addEventListener("click", () => submitGithubPat());
-btnClearGithubPat?.addEventListener("click", () => clearGithubPat());
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;
