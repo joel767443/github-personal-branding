@@ -31,7 +31,12 @@
       class="endorsementTabPanel<%= isActive ? "" : " hidden" %>"
       data-endorsement-panel="<%= d.key %>"
     >
-      <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+      <div class="dataPagePanel">
+        <div class="tableScroll">
+          <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+        </div>
+        <%- include("_pagination", { pagination: d.key === "endorsements" ? endorsementsPagination : recommendationsPagination }) %>
+      </div>
     </div>
   <% } %>
 </div>

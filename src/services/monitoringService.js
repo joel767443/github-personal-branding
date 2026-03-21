@@ -72,10 +72,25 @@ async function completeJobRun({ runId, summary = null, metadata = null }) {
   });
 }
 
-async function listJobRuns({ jobType, limit = 50 }) {
+function clampInt(n, min, max, fallback) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return fallback;
+  return Math.min(Math.max(Math.floor(v), min), max);
+}
+
+async function countJobRuns({ jobType } = {}) {
+  return prisma.jobRun.count({
+    where: jobType ? { jobType } : undefined,
+  });
+}
+
+async function listJobRuns({ jobType, limit = 50, skip = 0 } = {}) {
+  const take = clampInt(limit, 1, 200, 50);
+  const s = Math.max(0, Number(skip) || 0);
   return prisma.jobRun.findMany({
     where: jobType ? { jobType } : undefined,
-    take: Math.min(Math.max(Number(limit) || 50, 1), 200),
+    take,
+    skip: s,
     orderBy: { startedAt: "desc" },
   });
 }
@@ -88,9 +103,16 @@ async function getJobEvents(runId, { limit = 200 } = {}) {
   });
 }
 
-async function listFailures({ limit = 100 } = {}) {
+async function countFailures() {
+  return prisma.jobFailure.count();
+}
+
+async function listFailures({ limit = 100, skip = 0 } = {}) {
+  const take = clampInt(limit, 1, 500, 100);
+  const s = Math.max(0, Number(skip) || 0);
   return prisma.jobFailure.findMany({
-    take: Math.min(Math.max(Number(limit) || 100, 1), 500),
+    take,
+    skip: s,
     orderBy: { occurredAt: "desc" },
     include: {
       run: {
@@ -127,7 +149,9 @@ module.exports = {
   failJobRun,
   completeJobRun,
   listJobRuns,
+  countJobRuns,
   getJobEvents,
   listFailures,
+  countFailures,
   healthSnapshot,
 };

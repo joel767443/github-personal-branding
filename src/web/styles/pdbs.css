@@ -857,3 +857,121 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   color: #fff;
 }
 
+/* Data page panels & pagination */
+.dataPagePanel {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0;
+  margin-top: 4px;
+}
+
+.tableScroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
+  border: 1px solid #273056;
+  background: #0f1630;
+}
+
+.tableScroll .dataTable {
+  margin-top: 0;
+}
+
+.tableScroll .dataTable th:first-child,
+.tableScroll .dataTable td:first-child {
+  border-left: none;
+}
+
+.tableScroll .dataTable th:last-child,
+.tableScroll .dataTable td:last-child {
+  border-right: none;
+}
+
+.paginationBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid #273056;
+}
+
+.paginationMeta {
+  font-family: var(--pdbs-font-sans);
+  font-size: var(--pdbs-fs-small);
+  line-height: var(--pdbs-lh-body);
+  color: var(--pdbs-color-muted);
+}
+
+.paginationControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.paginationControls .tabBtn {
+  min-width: 2.25rem;
+  padding: 6px 10px;
+  font-size: var(--pdbs-fs-small);
+}
+
+.paginationControls .tabBtn[aria-current="true"] {
+  border-color: #3f8cff;
+  background: rgba(53, 129, 255, 0.2);
+  color: #e8f0ff;
+}
+
+.monitoringShell .tableScroll {
+  margin-top: 4px;
+}
+
+table.monitoringRunsTable {
+  font-size: var(--pdbs-fs-small);
+}
+
+.monitoringRunsTable .monoCell {
+  font-family: var(--pdbs-font-mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.jobStatusBadge {
+  display: inline-block;
+  font-family: var(--pdbs-font-sans);
+  font-size: var(--pdbs-fs-micro);
+  font-weight: var(--pdbs-fw-strong);
+  line-height: var(--pdbs-lh-tight);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid #3f8cff;
+  color: #bedeff;
+  background: rgba(53, 129, 255, 0.12);
+  white-space: nowrap;
+}
+
+.jobStatusBadge--running {
+  border-color: #5cd68d;
+  color: #c8f5dc;
+  background: rgba(80, 200, 120, 0.15);
+}
+
+.jobStatusBadge--completed {
+  border-color: #6b8cff;
+  color: #d6e0ff;
+  background: rgba(90, 120, 255, 0.14);
+}
+
+.jobStatusBadge--failed {
+  border-color: #ff6b6b;
+  color: #ffd0d0;
+  background: rgba(255, 80, 80, 0.12);
+}
+
+.monitoringSummaryCell {
+  max-width: 220px;
+  font-size: var(--pdbs-fs-small);
+}
+

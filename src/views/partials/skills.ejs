@@ -33,9 +33,19 @@
       data-skills-panel="<%= d.key %>"
     >
       <% if (d.key === "architectures") { %>
-        <%- include("_architectureFootprint", { rows: architectures, totalRepos: overview?.repos ?? 0 }) %>
+        <div class="dataPagePanel">
+          <div class="tableScroll">
+            <%- include("_architectureFootprint", { rows: architectures, totalRepos: overview?.repos ?? 0 }) %>
+          </div>
+          <%- include("_pagination", { pagination: architecturesPagination }) %>
+        </div>
       <% } else { %>
-        <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+        <div class="dataPagePanel">
+          <div class="tableScroll">
+            <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+          </div>
+          <%- include("_pagination", { pagination: d.key === "skills" ? skillsPagination : developerTechStacksPagination }) %>
+        </div>
       <% } %>
     </div>
   <% } %>

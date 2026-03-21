@@ -27,8 +27,53 @@ function formatDateTime(v) {
   return d.toLocaleString();
 }
 
+/** Query param keys for per-tab pagination (portfolio, skills, endorsements, monitoring). */
+const PAGINATION_PARAMS = {
+  experience: "page",
+  portfolioRepos: "reposPage",
+  portfolioProjects: "projectsPage",
+  skills: "skillsPage",
+  developerTechStacks: "dtsPage",
+  architectures: "archPage",
+  endorsements: "endorsementsPage",
+  recommendations: "recommendationsPage",
+  monitoringRuns: "runsPage",
+  monitoringFailures: "failuresPage",
+};
+
+function parsePage(raw, fallback = 1) {
+  const n = Number.parseInt(String(raw ?? "").trim(), 10);
+  if (!Number.isFinite(n) || n < 1) return fallback;
+  return n;
+}
+
+/**
+ * @param {unknown[]} items
+ * @param {{ page: number; pageSize: number }} opts
+ */
+function paginateArray(items, { page, pageSize }) {
+  const list = Array.isArray(items) ? items : [];
+  const size = Math.max(1, Math.floor(Number(pageSize) || 1));
+  const total = list.length;
+  const totalPages = Math.max(1, Math.ceil(total / size));
+  let p = Math.max(1, Math.floor(Number(page) || 1));
+  if (p > totalPages) p = totalPages;
+  const start = (p - 1) * size;
+  const slice = list.slice(start, start + size);
+  return {
+    slice,
+    page: p,
+    pageSize: size,
+    total,
+    totalPages,
+  };
+}
+
 module.exports = {
   columnLabel,
   formatDateTime,
+  PAGINATION_PARAMS,
+  parsePage,
+  paginateArray,
 };
 

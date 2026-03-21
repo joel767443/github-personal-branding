@@ -1,6 +1,7 @@
 <% if (!Array.isArray(projects) || projects.length === 0) { %>
   <div class="muted">No projects found.</div>
 <% } else { %>
+  <div class="dataPagePanel">
   <div class="cvList">
     <% for (const r of projects) { %>
       <% const title = r?.title ?? ""; %>
@@ -37,6 +38,8 @@
         <% } %>
       </div>
     <% } %>
+  </div>
+  <%- include("_pagination", { pagination: projectsPagination }) %>
   </div>
 <% } %>
 

@@ -1,0 +1,42 @@
+<% 
+  const p = typeof pagination !== "undefined" && pagination ? pagination : null;
+  const totalPages = p && p.paramName ? Math.max(1, Number(p.totalPages) || 1) : 0;
+  const page = p && p.paramName ? Math.min(Math.max(1, Number(p.page) || 1), totalPages) : 1;
+  const total = p && p.paramName ? Number(p.total) || 0 : 0;
+  const paramName = p && p.paramName ? String(p.paramName) : "";
+%>
+<% if (p && paramName && totalPages > 1) { %>
+<div class="paginationBar">
+  <div class="paginationMeta">Page <%= page %> of <%= totalPages %> · <%= total %> total</div>
+  <div class="paginationControls" role="navigation" aria-label="Pagination">
+    <button
+      type="button"
+      class="tabBtn"
+      data-pagination-param="<%= paramName %>"
+      data-pagination-page="<%= page - 1 %>"
+      aria-label="Previous page"
+      <%= page <= 1 ? "disabled" : "" %>
+    >Prev</button>
+    <% if (totalPages <= 12) { %>
+      <% for (let i = 1; i <= totalPages; i++) { %>
+        <button
+          type="button"
+          class="tabBtn"
+          data-pagination-param="<%= paramName %>"
+          data-pagination-page="<%= i %>"
+          aria-label="Page <%= i %>"
+          <% if (i === page) { %>aria-current="true"<% } %>
+        ><%= i %></button>
+      <% } %>
+    <% } %>
+    <button
+      type="button"
+      class="tabBtn"
+      data-pagination-param="<%= paramName %>"
+      data-pagination-page="<%= page + 1 %>"
+      aria-label="Next page"
+      <%= page >= totalPages ? "disabled" : "" %>
+    >Next</button>
+  </div>
+</div>
+<% } %>

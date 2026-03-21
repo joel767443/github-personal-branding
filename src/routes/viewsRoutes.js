@@ -108,7 +108,7 @@ router.get("/monitoring/shell", requireLogin, async (req, res) => {
 
 router.get("/monitoring/runs", requireLogin, async (req, res) => {
   try {
-    const model = await viewsDataService.getMonitoringRunsViewModel(req, { limit: req.query.limit });
+    const model = await viewsDataService.getMonitoringRunsViewModel(req);
     res.render("partials/monitoring/monitoringRunsTable", { ...model, formatDateTime });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render runs" });
@@ -129,8 +129,8 @@ router.get("/monitoring/health", requireLogin, async (req, res) => {
 
 router.get("/monitoring/failures", requireLogin, async (req, res) => {
   try {
-    const model = await viewsDataService.getMonitoringFailuresViewModel({ limit: req.query.limit });
-    res.render("partials/_dataTable", { rows: model.failures, columnLabel });
+    const model = await viewsDataService.getMonitoringFailuresViewModel(req);
+    res.render("partials/monitoring/monitoringFailuresTable", { ...model, columnLabel, formatDateTime });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render failures" });
   }

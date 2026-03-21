@@ -1,12 +1,19 @@
 const prisma = require("../db/prisma");
 const { resolveDeveloperFromSession } = require("./sessionDeveloperService");
 const { endorsementApiOmit } = require("../constants/apiResponseOmit");
+const { parsePage, paginateArray, PAGINATION_PARAMS } = require("./viewHelpers");
 const {
   listJobRuns,
   getJobEvents,
   listFailures,
   healthSnapshot,
+  countJobRuns,
+  countFailures,
 } = require("./monitoringService");
+
+const PAGE_SIZE_CV = 4;
+const PAGE_SIZE_REPOS_GRID = 16;
+const PAGE_SIZE_TABLE = 4;
 
 const omitId = { id: true };
 const omitIdDeveloperId = { id: true, developerId: true };
@@ -71,14 +78,26 @@ async function getExperienceViewModel(req) {
   });
 
   const sorted = [...rows].sort((a, b) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0));
+  const mapped = sorted.map((r) => ({
+    title: r?.title ?? "",
+    company: r?.company ?? "",
+    dates: r?.dates ?? "",
+    location: r?.location ?? "",
+    description: r?.description ?? "",
+  }));
+  const pr = paginateArray(mapped, {
+    page: parsePage(req.query[PAGINATION_PARAMS.experience]),
+    pageSize: PAGE_SIZE_CV,
+  });
   return {
-    rows: sorted.map((r) => ({
-      title: r?.title ?? "",
-      company: r?.company ?? "",
-      dates: r?.dates ?? "",
-      location: r?.location ?? "",
-      description: r?.description ?? "",
-    })),
+    rows: pr.slice,
+    pagination: {
+      paramName: PAGINATION_PARAMS.experience,
+      page: pr.page,
+      pageSize: pr.pageSize,
+      total: pr.total,
+      totalPages: pr.totalPages,
+    },
   };
 }
 
@@ -118,7 +137,7 @@ async function getSkillsTabsViewModel(req, activeTab) {
   const allowedTabs = new Set(["skills", "developer-tech-stacks", "architectures"]);
   const initialTab = normalizeActiveTab(activeTab, allowedTabs, "skills");
 
-  const [skills, developerTechStacks, architectures, reposCount] = await Promise.all([
+  const [skillsRaw, developerTechStacksRaw, architecturesRaw, reposCount] = await Promise.all([
     prisma.developerLinkedinSkill.findMany({
       where: { developerId },
       orderBy: { sortOrder: "asc" },
@@ -138,12 +157,49 @@ async function getSkillsTabsViewModel(req, activeTab) {
     prisma.repo.count({ where: { developerId } }),
   ]);
 
+  const skillsPr = paginateArray(skillsRaw, {
+    page: parsePage(req.query[PAGINATION_PARAMS.skills]),
+    pageSize: PAGE_SIZE_TABLE,
+  });
+  const dtsPr = paginateArray(developerTechStacksRaw, {
+    page: parsePage(req.query[PAGINATION_PARAMS.developerTechStacks]),
+    pageSize: PAGE_SIZE_TABLE,
+  });
+  const archSorted = [...architecturesRaw].sort(
+    (a, b) => Number(b?.count ?? 0) - Number(a?.count ?? 0),
+  );
+  const archPr = paginateArray(archSorted, {
+    page: parsePage(req.query[PAGINATION_PARAMS.architectures]),
+    pageSize: PAGE_SIZE_TABLE,
+  });
+
   return {
     activeTab: initialTab,
-    skills,
-    developerTechStacks,
-    architectures,
+    skills: skillsPr.slice,
+    developerTechStacks: dtsPr.slice,
+    architectures: archPr.slice,
     overview: { repos: reposCount },
+    skillsPagination: {
+      paramName: PAGINATION_PARAMS.skills,
+      page: skillsPr.page,
+      pageSize: skillsPr.pageSize,
+      total: skillsPr.total,
+      totalPages: skillsPr.totalPages,
+    },
+    developerTechStacksPagination: {
+      paramName: PAGINATION_PARAMS.developerTechStacks,
+      page: dtsPr.page,
+      pageSize: dtsPr.pageSize,
+      total: dtsPr.total,
+      totalPages: dtsPr.totalPages,
+    },
+    architecturesPagination: {
+      paramName: PAGINATION_PARAMS.architectures,
+      page: archPr.page,
+      pageSize: archPr.pageSize,
+      total: archPr.total,
+      totalPages: archPr.totalPages,
+    },
   };
 }
 
@@ -152,7 +208,7 @@ async function getEndorsementsTabsViewModel(req, activeTab) {
   const allowedTabs = new Set(["endorsements", "recommendations"]);
   const initialTab = normalizeActiveTab(activeTab, allowedTabs, "endorsements");
 
-  const [endorsements, recommendations] = await Promise.all([
+  const [endorsementsRaw, recommendationsRaw] = await Promise.all([
     prisma.developerLinkedinReceivedEndorsement.findMany({
       where: { developerId },
       orderBy: { sortOrder: "asc" },
@@ -165,7 +221,34 @@ async function getEndorsementsTabsViewModel(req, activeTab) {
     }),
   ]);
 
-  return { activeTab: initialTab, endorsements, recommendations };
+  const endPr = paginateArray(endorsementsRaw, {
+    page: parsePage(req.query[PAGINATION_PARAMS.endorsements]),
+    pageSize: PAGE_SIZE_TABLE,
+  });
+  const recPr = paginateArray(recommendationsRaw, {
+    page: parsePage(req.query[PAGINATION_PARAMS.recommendations]),
+    pageSize: PAGE_SIZE_TABLE,
+  });
+
+  return {
+    activeTab: initialTab,
+    endorsements: endPr.slice,
+    recommendations: recPr.slice,
+    endorsementsPagination: {
+      paramName: PAGINATION_PARAMS.endorsements,
+      page: endPr.page,
+      pageSize: endPr.pageSize,
+      total: endPr.total,
+      totalPages: endPr.totalPages,
+    },
+    recommendationsPagination: {
+      paramName: PAGINATION_PARAMS.recommendations,
+      page: recPr.page,
+      pageSize: recPr.pageSize,
+      total: recPr.total,
+      totalPages: recPr.totalPages,
+    },
+  };
 }
 
 function resolveProjectUrl(url) {
@@ -242,7 +325,34 @@ async function getPortfolioTabsViewModel(req, activeTab) {
 
   const projects = normalizeProjects(projectsRaw);
 
-  return { activeTab: initialTab, repos, projects };
+  const reposPr = paginateArray(repos, {
+    page: parsePage(req.query[PAGINATION_PARAMS.portfolioRepos]),
+    pageSize: PAGE_SIZE_REPOS_GRID,
+  });
+  const projectsPr = paginateArray(projects, {
+    page: parsePage(req.query[PAGINATION_PARAMS.portfolioProjects]),
+    pageSize: PAGE_SIZE_CV,
+  });
+
+  return {
+    activeTab: initialTab,
+    repos: reposPr.slice,
+    projects: projectsPr.slice,
+    reposPagination: {
+      paramName: PAGINATION_PARAMS.portfolioRepos,
+      page: reposPr.page,
+      pageSize: reposPr.pageSize,
+      total: reposPr.total,
+      totalPages: reposPr.totalPages,
+    },
+    projectsPagination: {
+      paramName: PAGINATION_PARAMS.portfolioProjects,
+      page: projectsPr.page,
+      pageSize: projectsPr.pageSize,
+      total: projectsPr.total,
+      totalPages: projectsPr.totalPages,
+    },
+  };
 }
 
 async function getProjectsViewModel(req) {
@@ -310,9 +420,25 @@ async function getArchitecturesViewModel(req) {
 // Monitoring view fragments
 // -------------------------
 
-async function getMonitoringRunsViewModel(req, { limit }) {
-  const runs = await listJobRuns({ limit, jobType: req.query.type ? String(req.query.type) : undefined });
-  return { runs: Array.isArray(runs) ? runs : [] };
+async function getMonitoringRunsViewModel(req) {
+  const jobType = req.query.type ? String(req.query.type) : undefined;
+  const pageSize = PAGE_SIZE_TABLE;
+  const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringRuns] ?? req.query.page);
+  const total = await countJobRuns({ jobType });
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pageRaw, totalPages);
+  const skip = (page - 1) * pageSize;
+  const runs = await listJobRuns({ jobType, limit: pageSize, skip });
+  return {
+    runs: Array.isArray(runs) ? runs : [],
+    pagination: {
+      paramName: PAGINATION_PARAMS.monitoringRuns,
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
 }
 
 async function getMonitoringHealthViewModel() {
@@ -320,9 +446,24 @@ async function getMonitoringHealthViewModel() {
   return { health };
 }
 
-async function getMonitoringFailuresViewModel({ limit }) {
-  const failures = await listFailures({ limit });
-  return { failures: Array.isArray(failures) ? failures : [] };
+async function getMonitoringFailuresViewModel(req) {
+  const pageSize = PAGE_SIZE_TABLE;
+  const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringFailures] ?? req.query.page);
+  const total = await countFailures();
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pageRaw, totalPages);
+  const skip = (page - 1) * pageSize;
+  const failures = await listFailures({ limit: pageSize, skip });
+  return {
+    failures: Array.isArray(failures) ? failures : [],
+    pagination: {
+      paramName: PAGINATION_PARAMS.monitoringFailures,
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
 }
 
 async function getMonitoringEventsViewModel(runId, { limit }) {

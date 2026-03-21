@@ -1,6 +1,7 @@
 <% if (!Array.isArray(repos) || repos.length === 0) { %>
   <div class="muted">No repos found.</div>
 <% } else { %>
+  <div class="dataPagePanel">
   <div class="repoGrid">
     <% for (const repo of repos) { %>
       <% const name = repo?.name ?? "Unnamed repo"; %>
@@ -31,6 +32,8 @@
         <% } %>
       </article>
     <% } %>
+  </div>
+  <%- include("_pagination", { pagination: reposPagination }) %>
   </div>
 <% } %>
 

@@ -31,9 +31,9 @@
       data-portfolio-panel="<%= d.key %>"
     >
       <% if (d.key === "repos") { %>
-        <%- include("repos", { repos }) %>
+        <%- include("repos", { repos, reposPagination }) %>
       <% } else { %>
-        <%- include("projects", { projects }) %>
+        <%- include("projects", { projects, projectsPagination }) %>
       <% } %>
     </div>
   <% } %>

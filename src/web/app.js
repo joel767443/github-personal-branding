@@ -487,6 +487,61 @@ function capitalizePageTitle(s) {
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
 
+/** Append current page query string to a `/views/...` path (no leading `?` in `path`). */
+function viewsUrl(path) {
+  const q = window.location.search;
+  if (!q) return path;
+  const [base, existing] = path.split("?");
+  const merged = new URLSearchParams(q);
+  if (existing) {
+    const extra = new URLSearchParams(existing);
+    for (const [k, v] of extra) merged.set(k, v);
+  }
+  const s = merged.toString();
+  return s ? `${base}?${s}` : base;
+}
+
+function monitoringTabFromSearch() {
+  const t = new URLSearchParams(window.location.search).get("tab");
+  if (t === "health" || t === "failures" || t === "runs") return t;
+  return "runs";
+}
+
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target?.closest?.("button[data-pagination-param][data-pagination-page]");
+  if (!btn || btn.disabled) return;
+  if (!dataPageContent?.contains(btn)) return;
+  const route = currentDataRoute();
+  if (!route || route.kind !== "data") return;
+  const param = btn.getAttribute("data-pagination-param");
+  const p = btn.getAttribute("data-pagination-page");
+  if (!param || p == null) return;
+  ev.preventDefault();
+  const u = new URL(window.location.href);
+  u.searchParams.set(param, p);
+  if (Number(p) <= 1) u.searchParams.delete(param);
+  if (route.page === "portfolio") {
+    if (param === "reposPage") u.searchParams.set("tab", "repos");
+    if (param === "projectsPage") u.searchParams.set("tab", "projects");
+  }
+  if (route.page === "skills") {
+    if (param === "skillsPage") u.searchParams.set("tab", "skills");
+    if (param === "dtsPage") u.searchParams.set("tab", "developer-tech-stacks");
+    if (param === "archPage") u.searchParams.set("tab", "architectures");
+  }
+  if (route.page === "endorsements") {
+    if (param === "endorsementsPage") u.searchParams.set("tab", "endorsements");
+    if (param === "recommendationsPage") u.searchParams.set("tab", "recommendations");
+  }
+  if (route.page === "monitoring") {
+    if (param === "runsPage") u.searchParams.set("tab", "runs");
+    if (param === "failuresPage") u.searchParams.set("tab", "failures");
+  }
+  history.pushState(null, "", u.toString());
+  syncSidebarActiveFromPath();
+  await loadDataPage();
+});
+
 function currentDataRoute() {
   const p = window.location.pathname || "/";
   // Dashboard content lives only at `/dashboard`. `/` is reserved for setup/login shell.
@@ -608,15 +663,18 @@ async function loadDataPage() {
     if (route?.page === "profile") {
       dataPageContent.innerHTML = await getHtml("/views/profile");
     } else if (route?.page === "experience") {
-      dataPageContent.innerHTML = await getHtml("/views/experience");
+      dataPageContent.innerHTML = await getHtml(viewsUrl("/views/experience"));
     } else if (route?.page === "projects") {
-      dataPageContent.innerHTML = await getHtml("/views/projects");
+      dataPageContent.innerHTML = await getHtml(viewsUrl("/views/projects"));
     } else if (route?.page === "repos") {
-      dataPageContent.innerHTML = await getHtml("/views/repos");
+      dataPageContent.innerHTML = await getHtml(viewsUrl("/views/repos"));
     } else if (route?.page === "architectures") {
-      dataPageContent.innerHTML = await getHtml("/views/architectures");
+      dataPageContent.innerHTML = await getHtml(viewsUrl("/views/architectures"));
     } else if (route?.page === "monitoring") {
-      const shellHtml = await getHtml("/views/monitoring/shell?activeTab=runs");
+      const activeTab = monitoringTabFromSearch();
+      const shellHtml = await getHtml(
+        `/views/monitoring/shell?activeTab=${encodeURIComponent(activeTab)}`,
+      );
       dataPageContent.innerHTML = shellHtml;
       const tabContent = document.getElementById("monitoringTabContent");
 
@@ -633,12 +691,18 @@ async function loadDataPage() {
         if (!tabContent) return;
         setLoadingState(tabContent, "Loading…");
         try {
+          const qs = window.location.search || "";
+          const q = qs.startsWith("?") ? qs.slice(1) : qs;
           if (tab === "health") {
             tabContent.innerHTML = await getHtml("/views/monitoring/health");
           } else if (tab === "failures") {
-            tabContent.innerHTML = await getHtml("/views/monitoring/failures?limit=50");
+            tabContent.innerHTML = await getHtml(
+              q ? `/views/monitoring/failures?${q}` : "/views/monitoring/failures",
+            );
           } else {
-            tabContent.innerHTML = await getHtml("/views/monitoring/runs?limit=50");
+            tabContent.innerHTML = await getHtml(
+              q ? `/views/monitoring/runs?${q}` : "/views/monitoring/runs",
+            );
           }
         } catch (err) {
           setErrorState(tabContent, err?.message || String(err));
@@ -651,7 +715,20 @@ async function loadDataPage() {
 
         if (btn) {
           const tab = btn.getAttribute("data-monitoring-tab");
-          if (tab) await loadTab(tab);
+          if (!tab) return;
+          const u = new URL(window.location.href);
+          u.searchParams.set("tab", tab);
+          if (tab === "runs") {
+            u.searchParams.delete("failuresPage");
+          } else if (tab === "failures") {
+            u.searchParams.delete("runsPage");
+          } else if (tab === "health") {
+            u.searchParams.delete("runsPage");
+            u.searchParams.delete("failuresPage");
+          }
+          history.pushState(null, "", u.toString());
+          syncSidebarActiveFromPath();
+          await loadTab(tab);
           return;
         }
 
@@ -669,31 +746,25 @@ async function loadDataPage() {
         }
       };
 
-      await loadTab("runs");
+      await loadTab(activeTab);
     } else if (route?.page === "portfolio") {
       const initialTab = route?.portfolioTab ?? "repos";
-      const tabParam = encodeURIComponent(initialTab);
-      dataPageContent.innerHTML = await getHtml(`/views/portfolio?tab=${tabParam}`);
+      const sp = new URLSearchParams(window.location.search);
+      sp.set("tab", initialTab);
+      dataPageContent.innerHTML = await getHtml(`/views/portfolio?${sp.toString()}`);
 
-      const setActiveTab = (tabKey) => {
-        const buttons = dataPageContent.querySelectorAll("button[data-portfolio-tab]");
-        for (const b of buttons) {
-          const isActive = b.getAttribute("data-portfolio-tab") === tabKey;
-          b.setAttribute("aria-selected", isActive ? "true" : "false");
-        }
-        const panels = dataPageContent.querySelectorAll(".portfolioTabPanel[data-portfolio-panel]");
-        for (const panel of panels) {
-          const key = panel.getAttribute("data-portfolio-panel");
-          panel.classList.toggle("hidden", key !== tabKey);
-        }
-      };
-
-      dataPageContent.onclick = (ev) => {
+      dataPageContent.onclick = async (ev) => {
         const btn = ev.target?.closest?.("button[data-portfolio-tab]");
         if (!btn) return;
         const tabKey = btn.getAttribute("data-portfolio-tab");
         if (!tabKey) return;
-        setActiveTab(tabKey);
+        const u = new URL(window.location.href);
+        u.searchParams.set("tab", tabKey);
+        u.searchParams.delete("reposPage");
+        u.searchParams.delete("projectsPage");
+        history.pushState(null, "", u.toString());
+        syncSidebarActiveFromPath();
+        await loadDataPage();
       };
     } else if (route?.page === "education") {
       const initialTab = route?.educationTab ?? "education";
@@ -722,53 +793,42 @@ async function loadDataPage() {
       };
     } else if (route?.page === "skills") {
       const initialTab = route?.skillsTab ?? "skills";
-      const tabParam = encodeURIComponent(initialTab);
-      dataPageContent.innerHTML = await getHtml(`/views/skills?tab=${tabParam}`);
+      const sp = new URLSearchParams(window.location.search);
+      sp.set("tab", initialTab);
+      dataPageContent.innerHTML = await getHtml(`/views/skills?${sp.toString()}`);
 
-      const setActiveTab = (tabKey) => {
-        const buttons = dataPageContent.querySelectorAll("button[data-skills-tab]");
-        for (const b of buttons) {
-          const isActive = b.getAttribute("data-skills-tab") === tabKey;
-          b.setAttribute("aria-selected", isActive ? "true" : "false");
-        }
-        const panels = dataPageContent.querySelectorAll(".skillsTabPanel[data-skills-panel]");
-        for (const panel of panels) {
-          const key = panel.getAttribute("data-skills-panel");
-          panel.classList.toggle("hidden", key !== tabKey);
-        }
-      };
-
-      dataPageContent.onclick = (ev) => {
+      dataPageContent.onclick = async (ev) => {
         const btn = ev.target?.closest?.("button[data-skills-tab]");
         if (!btn) return;
         const tabKey = btn.getAttribute("data-skills-tab");
         if (!tabKey) return;
-        setActiveTab(tabKey);
+        const u = new URL(window.location.href);
+        u.searchParams.set("tab", tabKey);
+        u.searchParams.delete("skillsPage");
+        u.searchParams.delete("dtsPage");
+        u.searchParams.delete("archPage");
+        history.pushState(null, "", u.toString());
+        syncSidebarActiveFromPath();
+        await loadDataPage();
       };
     } else if (route?.page === "endorsements") {
       const initialTab = route?.endorsementsTab ?? "endorsements";
-      const tabParam = encodeURIComponent(initialTab);
-      dataPageContent.innerHTML = await getHtml(`/views/endorsements?tab=${tabParam}`);
+      const sp = new URLSearchParams(window.location.search);
+      sp.set("tab", initialTab);
+      dataPageContent.innerHTML = await getHtml(`/views/endorsements?${sp.toString()}`);
 
-      const setActiveTab = (tabKey) => {
-        const buttons = dataPageContent.querySelectorAll("button[data-endorsement-tab]");
-        for (const b of buttons) {
-          const isActive = b.getAttribute("data-endorsement-tab") === tabKey;
-          b.setAttribute("aria-selected", isActive ? "true" : "false");
-        }
-        const panels = dataPageContent.querySelectorAll(".endorsementTabPanel[data-endorsement-panel]");
-        for (const panel of panels) {
-          const key = panel.getAttribute("data-endorsement-panel");
-          panel.classList.toggle("hidden", key !== tabKey);
-        }
-      };
-
-      dataPageContent.onclick = (ev) => {
+      dataPageContent.onclick = async (ev) => {
         const btn = ev.target?.closest?.("button[data-endorsement-tab]");
         if (!btn) return;
         const tabKey = btn.getAttribute("data-endorsement-tab");
         if (!tabKey) return;
-        setActiveTab(tabKey);
+        const u = new URL(window.location.href);
+        u.searchParams.set("tab", tabKey);
+        u.searchParams.delete("endorsementsPage");
+        u.searchParams.delete("recommendationsPage");
+        history.pushState(null, "", u.toString());
+        syncSidebarActiveFromPath();
+        await loadDataPage();
       };
     } else {
       throw new Error(`Unsupported page: ${route?.page ?? "(unknown)"}`);
