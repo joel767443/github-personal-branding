@@ -48,32 +48,19 @@
         <dd id="profilePhone"><%= p.phoneNumber ? p.phoneNumber : "—" %></dd>
       </div>
     </dl>
+    
+    <dl class="profileContactGrid">
+      <div class="profileContactItem">
+        <dt>Job title</dt>
+        <dd id="profileEmail"><%= p.jobTitle ? p.jobTitle : "—" %></dd>
+      </div>
+      <div class="profileContactItem">
+        <dt>LinkedIn about</dt>
+        <dd id="profilePhone"><%= p.linkedinSummary || "—" %></dd>
+      </div>
+    </dl>
+
   </section>
-
-  <div class="profileBioGrid">
-    <section class="profileBioPanel" aria-labelledby="profile-job-title-heading">
-      <h3 id="profile-job-title-heading" class="profileBioTitle">Job title</h3>
-      <p id="profileJobTitle" class="profileBioBody"><%= p.jobTitle || "—" %></p>
-      <h3 class="profileBioTitle">Bio</h3>
-      <div id="profileSummary" class="profileBioBody profileBioBody--prose"><%= p.summary || "—" %></div>
-    </section>
-    <section class="profileBioPanel" aria-labelledby="profile-li-heading">
-      <h3 id="profile-li-heading" class="profileBioTitle">LinkedIn about</h3>
-      <div id="profileLinkedinSummary" class="profileBioBody profileBioBody--prose"><%= p.linkedinSummary || "—" %></div>
-    </section>
-  </div>
-
-  <footer class="profileMetaStrip">
-    <span class="profileMetaItem">
-      <span class="profileMetaLabel">Created</span>
-      <time class="profileMetaValue" datetime="<%= p.createdAt || "" %>"><%= p.createdAt ? formatDateTime(p.createdAt) : "—" %></time>
-    </span>
-    <span class="profileMetaSep" aria-hidden="true"></span>
-    <span class="profileMetaItem">
-      <span class="profileMetaLabel">Updated</span>
-      <time class="profileMetaValue" datetime="<%= p.updatedAt || "" %>"><%= p.updatedAt ? formatDateTime(p.updatedAt) : "—" %></time>
-    </span>
-  </footer>
 </div>
 
 <div class="card profileUploadCard hidden" id="uploadCard">

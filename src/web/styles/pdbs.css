@@ -117,6 +117,72 @@ input {
   font-size: var(--pdbs-fs-body);
   line-height: var(--pdbs-lh-body);
 }
+
+select {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 9px 36px 9px 10px;
+  border-radius: 8px;
+  border: 1px solid #364070;
+  background-color: #0d1430;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239aacff' d='M3 4.5l3 4 3-4z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+  color: var(--pdbs-color-text);
+  font-family: var(--pdbs-font-sans);
+  font-size: var(--pdbs-fs-body);
+  line-height: var(--pdbs-lh-tight);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+select:focus {
+  outline: none;
+  border-color: #4b6bff;
+  box-shadow: 0 0 0 1px rgba(75, 107, 255, 0.45);
+}
+
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+select option {
+  background: #0d1430;
+  color: var(--pdbs-color-text);
+}
+
+.settingsSyncRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingsSyncRow > label {
+  margin-bottom: 0;
+}
+
+.settingsSyncControls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.settingsSyncControls select {
+  flex: 1 1 200px;
+  width: auto;
+  min-width: 0;
+}
+
+.settingsSyncControls #saveSettingsBtn {
+  flex: 0 0 auto;
+  margin-right: 0;
+}
+
 button {
   font-family: var(--pdbs-font-sans);
   font-size: var(--pdbs-fs-body);
