@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "deploy-portfolio": "node scripts/deployPortfolio.js",
     "deploy-portfolio:regen": "node scripts/deployPortfolio.js --regenerate",
+    "sample-facebook-post": "node scripts/sampleFacebookPost.js",
     "push:origin": "git push origin HEAD"
   },
   "keywords": [],

@@ -127,7 +127,7 @@ model DeveloperSocialIntegration {
   @@map("developer_social_integrations")
 }
 
-/// Facebook Page posting: page id (or username), Page access token (encrypted at rest), optional last-post timestamp.
+/// Facebook **Page** only (Graph `/{page-id}/feed`). Meta does not support app POST to personal profile feeds.
 model DeveloperFacebookAuthData {
   id               Int       @id @default(autoincrement())
   developerId      Int       @unique @map("developer_id")

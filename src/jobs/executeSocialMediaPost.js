@@ -1,3 +1,11 @@
+/**
+ * Facebook Graph API posting for this app is **Page-only**: `POST /{page-id}/feed` with a Page access token.
+ * Meta does not support creating posts on a **personal profile** timeline via `/{user-id}/feed` for third-party
+ * apps (User Feed “Creating” is disallowed; `publish_actions` was removed). Do not add user-timeline POST here.
+ *
+ * @see https://developers.facebook.com/docs/graph-api/reference/user/feed/
+ * @see https://developers.facebook.com/docs/graph-api/reference/page/feed/
+ */
 const prisma = require('../db/prisma');
 const { decryptField } = require('../crypto/fieldEncryption');
 const { facebookGraphApiVersion } = require('../services/facebookOAuth');
@@ -47,6 +55,10 @@ async function postFacebook(developerId, payload) {
     body: body.toString(),
   });
   const json = await resp.json().catch(() => ({}));
+  if (json.error) {
+    const msg = json.error.message || json.error.type || 'Graph API error';
+    throw new Error(`Facebook: ${msg}`);
+  }
   if (!resp.ok) {
     const msg = json?.error?.message || json?.error_msg || resp.statusText || 'Graph API error';
     throw new Error(`Facebook: ${msg}`);
@@ -78,11 +90,9 @@ async function executeSocialMediaPost({ developerId, platform, payload }) {
   }
   if (p === 'twitter') {
     new TwitterPostPayload(payload ?? {}).toApiBody();
-    return { platform: 'twitter', skipped: true };
   }
   if (p === 'linkedin') {
     new LinkedInPostPayload(payload ?? {}).toApiBody();
-    return { platform: 'linkedin', skipped: true };
   }
   throw new Error(`executeSocialMediaPost: unknown platform "${platform}"`);
 }

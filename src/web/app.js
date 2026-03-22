@@ -84,6 +84,7 @@ const settingsCardMountProfile = document.getElementById("settingsCardMountProfi
 const syncFrequencySelect = document.getElementById("syncFrequencySelect");
 const saveSettingsBtn = document.getElementById("saveSettingsBtn");
 const facebookStatus = document.getElementById("facebookStatus");
+const facebookSharePersonalLink = document.getElementById("facebookSharePersonalLink");
 const socialTwitter = document.getElementById("socialTwitter");
 const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
@@ -443,7 +444,8 @@ function applyFacebookOAuthFlash() {
   const ok = u.searchParams.get("facebook");
   const err = u.searchParams.get("facebook_error");
   if (ok === "connected" && settingsMsg) {
-    settingsMsg.textContent = "Facebook connected.";
+    settingsMsg.textContent =
+      "Facebook Page connected. Automated posts will go to this Page (not your personal profile).";
   } else if (err && settingsMsg) {
     let decoded = err;
     try {
@@ -451,7 +453,16 @@ function applyFacebookOAuthFlash() {
     } catch {
       decoded = String(err);
     }
-    settingsMsg.textContent = `Facebook: ${decoded}`;
+    const lower = decoded.toLowerCase();
+    if (lower.includes("no_pages") || lower.includes("no facebook pages")) {
+      settingsMsg.textContent =
+        "Facebook: No Page found. Create a Facebook Page or use an account that manages one, then try Connect again. Personal profiles cannot receive API posts.";
+    } else if (lower.includes("no_page_token")) {
+      settingsMsg.textContent =
+        "Facebook: Pages were returned but Meta did not grant a page token. Check app permissions and your Page role.";
+    } else {
+      settingsMsg.textContent = `Facebook: ${decoded}`;
+    }
   }
   if (ok || err) {
     u.searchParams.delete("facebook");
@@ -477,11 +488,11 @@ async function loadSettingsForm() {
     const fb = d.developerFacebookAuthData;
     if (facebookStatus) {
       if (fb?.facebookPageConnected && fb?.facebookPageId) {
-        facebookStatus.textContent = `Connected (Page ${fb.facebookPageId})`;
+        facebookStatus.textContent = `Page connected (ID ${fb.facebookPageId}) — API posts use this Page`;
       } else if (fb?.facebookPageConnected) {
-        facebookStatus.textContent = "Connected";
+        facebookStatus.textContent = "Page connected — API posts use this Page";
       } else {
-        facebookStatus.textContent = "Not connected";
+        facebookStatus.textContent = "No Page connected for API posting";
       }
     }
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
@@ -1407,6 +1418,17 @@ async function submitGithubPat() {
 }
 
 btnSaveGithubPat?.addEventListener("click", () => submitGithubPat());
+
+facebookSharePersonalLink?.addEventListener("click", (e) => {
+  e.preventDefault();
+  const origin = window.location.origin || "";
+  const u = encodeURIComponent(`${origin}/`);
+  window.open(
+    `https://www.facebook.com/sharer/sharer.php?u=${u}`,
+    "fb_share",
+    "width=600,height=440,noopener,noreferrer",
+  );
+});
 
 saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;

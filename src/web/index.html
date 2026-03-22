@@ -84,10 +84,23 @@
           <div class="row">
             <span class="muted">Social integrations ($1/mo each when enabled)</span>
           </div>
-          <div class="row settings-facebook-row">
-            <span class="muted">Facebook ($1/mo when connected)</span>
-            <a href="/auth/facebook" id="facebookConnectLink">Connect Facebook</a>
-            <span id="facebookStatus" class="muted" aria-live="polite"></span>
+          <div class="row settings-facebook-col">
+            <div class="settings-facebook-block">
+              <strong>Facebook Page (automated posts)</strong>
+              <p class="muted">
+                Background posts use Meta’s API and go to a <strong>Facebook Page</strong> you manage (not a personal
+                profile timeline—Meta does not allow server-side posting to profiles).
+              </p>
+              <div class="row settings-facebook-row">
+                <span class="muted">$1/mo add-on when connected (Stripe)</span>
+                <a href="/auth/facebook" id="facebookConnectLink">Connect Facebook Page</a>
+                <span id="facebookStatus" class="muted" aria-live="polite"></span>
+              </div>
+              <p class="muted">Share on your own timeline (manual — opens Facebook):</p>
+              <p>
+                <a href="#" id="facebookSharePersonalLink">Share this app on Facebook (personal timeline)</a>
+              </p>
+            </div>
           </div>
           <div class="row">
             <label><input type="checkbox" id="socialTwitter" /> Twitter</label>

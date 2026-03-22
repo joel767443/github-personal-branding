@@ -13,7 +13,24 @@ function facebookGraphApiVersion() {
   return v.startsWith('v') ? v : `v${v}`;
 }
 
+/**
+ * Comma-separated scopes for Facebook Login. Default `pages_show_list` works without Advanced permissions;
+ * add `pages_manage_posts` (and others) via env after Meta app review.
+ */
+function resolveFacebookOAuthScopes() {
+  const raw = String(process.env.FACEBOOK_OAUTH_SCOPES ?? '').trim();
+  if (raw) {
+    return raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .join(',');
+  }
+  return 'pages_show_list';
+}
+
 module.exports = {
   resolveFacebookOAuthRedirectUri,
   facebookGraphApiVersion,
+  resolveFacebookOAuthScopes,
 };

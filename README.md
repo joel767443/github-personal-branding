@@ -68,12 +68,21 @@ When the app runs deploy after sync, it passes each developer’s deploy setting
 
 See `.example.env` for placeholders.
 
+### Facebook (optional)
+
+Automated posts use the **Graph API Page feed** only (`POST /{page-id}/feed`). You must connect a **Facebook Page** you manage (OAuth loads `/me/accounts` and stores a Page token). Meta does **not** allow apps to post to **personal profile** timelines via the standard Graph API.
+
+**Typical env:** `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, optional `FACEBOOK_OAUTH_CALLBACK_URL`, optional `FACEBOOK_OAUTH_SCOPES` (default `pages_show_list` in code). Background jobs need Redis: `REDIS_URL`. Sample post: `npm run sample-facebook-post` (requires a row in `developer_facebook_auth_data` after a successful Page connect).
+
+For sharing to your **own** timeline without API posting, use the dashboard link that opens Facebook’s sharer (manual).
+
 ## npm scripts
 
 | Script | Command |
 |--------|---------|
 | `npm run deploy-portfolio` | Push generated `./portfolio` (uses `developers.deploy_repo_url` when `DEPLOY_REPO_URL` is unset) |
 | `npm run deploy-portfolio:regen` | Regenerate portfolio from DB, then deploy |
+| `npm run sample-facebook-post` | Enqueue a sample **Facebook Page** post (needs Redis + Page OAuth data) |
 | `npm run push:origin` | `git push origin HEAD` (this app’s source repo) |
 
 ## Repository layout

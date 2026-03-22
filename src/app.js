@@ -49,6 +49,7 @@ const { parseSyncFrequency } = require('./services/syncFrequencyHelpers');
 const {
   resolveFacebookOAuthRedirectUri,
   facebookGraphApiVersion,
+  resolveFacebookOAuthScopes,
 } = require('./services/facebookOAuth');
 const { respondError } = require('./utils/httpErrors');
 const { sanitizeDeveloperForClient } = require('./utils/developerApiSanitize');
@@ -570,12 +571,11 @@ app.get('/auth/github/callback', async (req, res) => {
   }
 });
 
-const FACEBOOK_PAGE_SCOPES = ['pages_show_list', 'pages_manage_posts'].join(',');
-
 app.get('/auth/facebook', async (req, res) => {
   try {
-    const developerId = req.session?.user?.developerId;
-    if (developerId == null) {
+    const rawDevId = req.session?.user?.developerId;
+    const developerId = rawDevId != null ? Number(rawDevId) : NaN;
+    if (!Number.isFinite(developerId) || developerId <= 0) {
       return res.redirect(302, '/?facebook=login_required');
     }
     const appId = String(process.env.FACEBOOK_APP_ID ?? '').trim();
@@ -592,7 +592,7 @@ app.get('/auth/facebook', async (req, res) => {
     url.searchParams.set('client_id', appId);
     url.searchParams.set('redirect_uri', redirectUri);
     url.searchParams.set('state', state);
-    url.searchParams.set('scope', FACEBOOK_PAGE_SCOPES);
+    url.searchParams.set('scope', resolveFacebookOAuthScopes());
     res.redirect(302, url.toString());
   } catch (err) {
     respondError(res, 500, 'Facebook OAuth start failed', err?.message ?? String(err));
@@ -600,7 +600,13 @@ app.get('/auth/facebook', async (req, res) => {
 });
 
 app.get('/auth/facebook/callback', async (req, res) => {
-  const fail = (code) => res.redirect(302, `/dashboard?facebook_error=${encodeURIComponent(code)}`);
+  const logFb = (msg, extra = {}) => {
+    console.error('[facebook-oauth]', msg, extra);
+  };
+  const fail = (code) => {
+    logFb('callback failed', { code: String(code).slice(0, 200) });
+    return res.redirect(302, `/dashboard?facebook_error=${encodeURIComponent(code)}`);
+  };
   try {
     const { code, state, error, error_reason: _errorReason, error_description: errorDescription } = req.query;
     if (error) {
@@ -610,8 +616,9 @@ app.get('/auth/facebook/callback', async (req, res) => {
     if (!code || !state || state !== req.session.oauthFacebookState) {
       return fail('state');
     }
-    const developerId = req.session?.user?.developerId;
-    if (developerId == null) {
+    const rawDevId = req.session?.user?.developerId;
+    const developerId = rawDevId != null ? Number(rawDevId) : NaN;
+    if (!Number.isFinite(developerId) || developerId <= 0) {
       return fail('session');
     }
     const redirectUri = req.session.oauthFacebookRedirectUri ?? resolveFacebookOAuthRedirectUri(req);
@@ -635,7 +642,8 @@ app.get('/auth/facebook/callback', async (req, res) => {
     const tokenJson = await tokenResp.json();
     let userAccessToken = tokenJson.access_token;
     if (!userAccessToken) {
-      return fail('token');
+      const hint = tokenJson.error?.message || tokenJson.error?.type || tokenJson.error_description;
+      return fail(hint ? `token:${String(hint).slice(0, 100)}` : 'token');
     }
 
     const longLivedUrl = new URL(`https://graph.facebook.com/${graphV}/oauth/access_token`);
@@ -645,16 +653,30 @@ app.get('/auth/facebook/callback', async (req, res) => {
     longLivedUrl.searchParams.set('fb_exchange_token', userAccessToken);
     const llResp = await fetch(longLivedUrl.toString());
     const llJson = await llResp.json();
+    if (llJson.error) {
+      logFb('long-lived token exchange warning', { err: llJson.error });
+    }
     if (llJson.access_token) {
       userAccessToken = llJson.access_token;
     }
 
-    const accountsUrl = new URL(`https://graph.facebook.com/${graphV}/me/accounts`);
-    accountsUrl.searchParams.set('fields', 'id,name,access_token,tasks');
-    accountsUrl.searchParams.set('access_token', userAccessToken);
-    const accResp = await fetch(accountsUrl.toString());
-    const accJson = await accResp.json();
-    const pages = Array.isArray(accJson.data) ? accJson.data : [];
+    /** @type {{ id?: string, name?: string, access_token?: string, tasks?: string[] }[]} */
+    let pages = [];
+    let nextUrl = `https://graph.facebook.com/${graphV}/me/accounts?fields=id,name,access_token,tasks&limit=100&access_token=${encodeURIComponent(userAccessToken)}`;
+    for (let pageFetch = 0; pageFetch < 10 && nextUrl; pageFetch += 1) {
+      const accResp = await fetch(nextUrl);
+      const accJson = await accResp.json();
+      if (accJson.error) {
+        const em = accJson.error.message || accJson.error.type || 'graph_error';
+        return fail(`accounts:${String(em).slice(0, 100)}`);
+      }
+      if (Array.isArray(accJson.data)) {
+        pages = pages.concat(accJson.data);
+      }
+      nextUrl = accJson.paging?.next || null;
+    }
+
+    logFb('/me/accounts pages', { count: pages.length, developerId });
     const hasManage = (tasks) =>
       Array.isArray(tasks) &&
       (tasks.includes('MANAGE') || tasks.includes('CREATE_CONTENT') || tasks.includes('MODERATE'));
@@ -662,8 +684,18 @@ app.get('/auth/facebook/callback', async (req, res) => {
       pages.find((p) => p?.access_token && hasManage(p.tasks)) ||
       pages.find((p) => p?.access_token) ||
       null;
+    if (!pickPage?.access_token && pages.length > 0) {
+      logFb('pages without access_token field', {
+        pageIds: pages.map((p) => p.id).slice(0, 10),
+      });
+      return fail(
+        'no_page_token: Meta returned Pages but no page access_token. Re-check app permissions and Page admin role.',
+      );
+    }
     if (!pickPage?.access_token) {
-      return fail('no_pages');
+      return fail(
+        'no_pages: No Facebook Pages returned for this account. Create a Page at facebook.com/pages/create or ask a Page admin to add you, then try again.',
+      );
     }
 
     const pageTokenEnc = encryptField(pickPage.access_token);
@@ -697,8 +729,10 @@ app.get('/auth/facebook/callback', async (req, res) => {
       update: { enabled: true },
     });
 
+    logFb('saved developer_facebook_auth_data', { developerId, facebookPageId: pageId });
     return res.redirect(302, '/dashboard?facebook=connected');
   } catch (err) {
+    console.error('[facebook-oauth] exception', err);
     return fail(String(err?.message ?? err).slice(0, 120) || 'exception');
   }
 });
