@@ -90,7 +90,6 @@ const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
 const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
-const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
 const githubPatInput = document.getElementById("githubPatInput");
 const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
 const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
@@ -495,15 +494,15 @@ async function loadSettingsForm() {
         facebookStatus.textContent = "No Page connected for API posting";
       }
     }
-    if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
     const deployUrlField = document.getElementById("deployRepoUrlInput");
     if (deployUrlField) deployUrlField.value = d.deployRepoUrl ?? "";
+    // Secrets are never returned from the API (only *Configured flags); keep field empty for security.
+    if (githubPatInput) githubPatInput.value = "";
     if (githubPatConfiguredHint) {
       githubPatConfiguredHint.textContent = d.githubPatConfigured
-        ? "A token is saved (paste a new one to replace it)."
-        : "No token saved yet.";
+        ? "A GitHub token is saved (paste a new one to replace it)."
+        : "No GitHub token saved yet.";
     }
-    if (githubPatInput) githubPatInput.value = "";
   } catch (_) {
     /* ignore */
   }
@@ -1444,7 +1443,6 @@ saveSettingsBtn?.addEventListener("click", async () => {
           TWITTER: Boolean(socialTwitter?.checked),
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },
-        deployPortfolioAfterSync: Boolean(deployPortfolioAfterSync?.checked),
         deployRepoUrl: deployUrlEl?.value?.trim() ?? "",
       }),
     });

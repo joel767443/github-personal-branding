@@ -56,7 +56,7 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 
 **GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
 
-Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), deploy toggle (`deployPortfolioAfterSync`), and **portfolio deploy target URL** in **`deploy_repo_url`** (set in the dashboard as “Deploy repo URL”). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Optional server `DEPLOY_REPO_URL` can still override for a process when set; otherwise deploy reads `deploy_repo_url` from the database.
+Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and **portfolio deploy target URL** in **`deploy_repo_url`** (set in the dashboard as “Deploy repo URL”). After each sync, portfolio deploy runs automatically when a deploy repo URL is configured (see deploy script behavior). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Optional server `DEPLOY_REPO_URL` can still override for a process when set; otherwise deploy reads `deploy_repo_url` from the database.
 
 **Portfolio deploy CLI** (manual runs only):
 

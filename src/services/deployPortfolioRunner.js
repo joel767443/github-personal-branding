@@ -19,12 +19,11 @@ async function buildDeployProcessEnv(developerId) {
   const dev = await prisma.developer.findUnique({
     where: { id: developerId },
     select: {
-      deployPortfolioAfterSync: true,
       deployRepoUrl: true,
     },
   });
   if (dev) {
-    env.DEPLOY_PORTFOLIO_AFTER_SYNC = dev.deployPortfolioAfterSync !== false ? '1' : '0';
+    env.DEPLOY_PORTFOLIO_AFTER_SYNC = '1';
     const repo = String(dev.deployRepoUrl ?? '').trim();
     if (repo) {
       env.DEPLOY_REPO_URL = repo;

@@ -767,9 +767,6 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     if (body.syncFrequency != null) {
       data.syncFrequency = parseSyncFrequency(body.syncFrequency);
     }
-    if (body.deployPortfolioAfterSync !== undefined) {
-      data.deployPortfolioAfterSync = Boolean(body.deployPortfolioAfterSync);
-    }
     const deployRepoRaw = body.deployRepoUrl ?? body.deploy_repo_url;
     if (deployRepoRaw !== undefined) {
       const u = String(deployRepoRaw ?? '').trim();

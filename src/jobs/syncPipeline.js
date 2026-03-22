@@ -29,13 +29,13 @@ async function executeSyncPipeline({ developerId, onProgress, req }) {
   if (resolvedDeveloperId != null) {
     await generatePortfolioOutput({ developerId: resolvedDeveloperId, onProgress: progress });
 
-    const row = await prisma.developer.findUnique({
+    const deployTarget = await prisma.developer.findUnique({
       where: { id: resolvedDeveloperId },
-      select: { deployPortfolioAfterSync: true },
+      select: { deployRepoUrl: true },
     });
-    const deploy = row ? row.deployPortfolioAfterSync !== false : false;
-
-    if (deploy) {
+    const devUrl = String(deployTarget?.deployRepoUrl ?? '').trim();
+    const serverUrl = String(process.env.DEPLOY_REPO_URL ?? '').trim();
+    if (devUrl || serverUrl) {
       await runDeployPortfolioCli(progress, resolvedDeveloperId);
     }
   }

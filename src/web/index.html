@@ -96,31 +96,18 @@
                 <a href="/auth/facebook" id="facebookConnectLink">Connect Facebook Page</a>
                 <span id="facebookStatus" class="muted" aria-live="polite"></span>
               </div>
-              <p class="muted">Share on your own timeline (manual — opens Facebook):</p>
-              <p>
-                <a href="#" id="facebookSharePersonalLink">Share this app on Facebook (personal timeline)</a>
-              </p>
             </div>
           </div>
           <div class="row">
             <label><input type="checkbox" id="socialTwitter" /> Twitter</label>
             <label><input type="checkbox" id="socialLinkedin" /> LinkedIn</label>
           </div>
-          <p class="muted">Portfolio deploy</p>
-          <div class="row">
-            <label><input type="checkbox" id="deployPortfolioAfterSync" /> Deploy portfolio automatically after sync</label>
-          </div>
-          <p class="muted">GitHub API (repo sync)</p>
-          <p class="muted">
-            Fine-grained or classic personal access token with access to your repositories. Stored encrypted on your
-            developer record. Optional when the server provides a shared <code>GITHUB_TOKEN</code>.
-          </p>
           <div class="row auth-field">
-            <label for="githubPatInput">GitHub PAT</label>
+            <label for="githubPatInput">GitHub personal access token</label>
             <input id="githubPatInput" type="password" autocomplete="off" placeholder="Paste token to save" />
           </div>
           <div class="row auth-field">
-            <label for="deployRepoUrlInput">Deploy repo URL</label>
+            <label for="deployRepoUrlInput">GitHub profile repository URL</label>
             <input
               id="deployRepoUrlInput"
               type="text"
@@ -129,10 +116,6 @@
               placeholder="https://github.com/username/repo.git"
             />
           </div>
-          <p class="muted">
-            Optional. Same as server <code>DEPLOY_REPO_URL</code> — HTTPS clone URL for the repo that receives the
-            generated portfolio README. When set, it overrides the server environment for your deploys.
-          </p>
           <div id="githubPatConfiguredHint" class="muted"></div>
           <div class="row">
             <button type="button" id="btnSaveGithubPat">Save GitHub token</button>
