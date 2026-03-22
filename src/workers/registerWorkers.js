@@ -38,7 +38,7 @@ function registerWorkers() {
     SYNC_QUEUE,
     async (job) => {
       const { runId, developerId, userLogin } = job.data;
-      progressBus.start(runId, { job: 'sync', label: 'Sync started' });
+      progressBus.start(runId, { job: 'sync', label: 'Sync started', developerId });
       const onProgress = makeProgress(runId, 'sync');
       try {
         await executeSyncPipeline({
@@ -66,7 +66,7 @@ function registerWorkers() {
     LINKEDIN_QUEUE,
     async (job) => {
       const { runId, developerId, zipPath } = job.data;
-      progressBus.start(runId, { job: 'linkedin', label: 'LinkedIn import started' });
+      progressBus.start(runId, { job: 'linkedin', label: 'LinkedIn import started', developerId });
       const onProgress = makeProgress(runId, 'linkedin');
       try {
         const importResult = await executeLinkedinImportPipeline({
@@ -149,7 +149,7 @@ function registerWorkers() {
       for (const d of due) {
         if (!d.githubUsername && !d.githubLogin) continue;
         const runId = `run_scheduled_${Date.now()}_${d.id}`;
-        progressBus.start(runId, { job: 'sync', label: 'Scheduled sync started' });
+        progressBus.start(runId, { job: 'sync', label: 'Scheduled sync started', developerId: d.id });
         await startJobRun({
           runId,
           jobType: 'sync',

@@ -54,6 +54,11 @@ const {
 } = require('./services/facebookOAuth');
 const { respondError } = require('./utils/httpErrors');
 const { sanitizeDeveloperForClient } = require('./utils/developerApiSanitize');
+const {
+  clientSafeMessage,
+  clientSafeUpstreamDetails,
+  githubOAuthTokenErrorForClient,
+} = require('./utils/safeClientError');
 
 function envFlagTrue(name) {
   const v = String(process.env[name] ?? '').toLowerCase().trim();
@@ -76,7 +81,11 @@ app.post(
       await stripeService.handleSubscriptionWebhook(event);
       res.json({ received: true });
     } catch (err) {
-      res.status(400).send(`Webhook Error: ${err?.message ?? err}`);
+      const msg =
+        process.env.NODE_ENV === 'production'
+          ? 'Webhook Error'
+          : `Webhook Error: ${err?.message ?? err}`;
+      res.status(400).send(msg);
     }
   },
 );
@@ -193,7 +202,7 @@ async function runSyncPipeline(req) {
   const runId = `run_${Date.now()}`;
   syncInProgress = true;
   activeRunId = runId;
-  progressBus.start(runId, { job: 'sync', label: 'Sync started' });
+  progressBus.start(runId, { job: 'sync', label: 'Sync started', developerId });
   await startJobRun({
     runId,
     jobType: 'sync',
@@ -425,7 +434,7 @@ app.get('/auth/github', async (req, res) => {
     }
     res.redirect(url.toString());
   } catch (err) {
-    respondError(res, 500, 'OAuth start failed', err?.message ?? String(err));
+    respondError(res, 500, 'OAuth start failed', clientSafeMessage(err, 'OAuth start failed'));
   }
 });
 
@@ -461,21 +470,22 @@ app.get('/auth/github/callback', async (req, res) => {
     const tokenJson = await tokenResp.json();
     const accessToken = tokenJson.access_token;
     if (!accessToken) {
+      const safe = githubOAuthTokenErrorForClient(tokenJson);
       if (tokenJson.error === 'incorrect_client_credentials') {
         return respondError(res, 400, 'OAuth token exchange failed', {
-          ...tokenJson,
+          ...safe,
           hint:
             'Use the OAuth App Client ID and Client secret from GitHub → Settings → Developer settings → OAuth Apps (not a GitHub App’s credentials). They must be from the same app. Regenerate the client secret if unsure. A personal access token (ghp_...) cannot be used as the client secret.',
         });
       }
       if (tokenJson.error === 'redirect_uri_mismatch') {
         return respondError(res, 400, 'OAuth token exchange failed', {
-          ...tokenJson,
+          ...safe,
           hint:
             'The redirect URL sent to GitHub must match your OAuth App’s Authorization callback URL and stay identical between /auth/github and the token request. Set GITHUB_OAUTH_CALLBACK_URL to that exact URL if you use a custom host or proxy.',
         });
       }
-      return respondError(res, 400, 'OAuth token exchange failed', tokenJson);
+      return respondError(res, 400, 'OAuth token exchange failed', safe);
     }
 
     const userResp = await fetch('https://api.github.com/user', {
@@ -575,7 +585,7 @@ app.get('/auth/github/callback', async (req, res) => {
     delete req.session.oauthGithubRedirectUri;
     res.redirect('/dashboard');
   } catch (err) {
-    respondError(res, 500, 'OAuth callback failed', err?.message ?? String(err));
+    respondError(res, 500, 'OAuth callback failed', clientSafeMessage(err, 'OAuth callback failed'));
   }
 });
 
@@ -988,6 +998,15 @@ app.get('/setup/status', async (req, res) => {
 
 app.post('/setup/submit', async (req, res) => {
   try {
+    const envSnapshot = { ...process.env, ...readCurrentEnv() };
+    if (missingConfigKeys(envSnapshot).length === 0) {
+      return respondError(
+        res,
+        403,
+        'Setup already completed',
+        'Initial setup is only available before the server is fully configured.',
+      );
+    }
     const {
       port,
       githubClientId,
@@ -1043,17 +1062,23 @@ app.post('/sync/start', requireLogin, async (req, res) => {
   res.json({ ok: true, runId: started.runId, queued: Boolean(started.queued) });
 });
 
-app.get('/sync/progress', requireLogin, (req, res) => {
+app.get('/sync/progress', requireLogin, async (req, res) => {
+  const resolved = await resolveDeveloperFromSession(req);
+  const developerId = resolved?.developer?.id ?? null;
+  if (developerId == null) {
+    return respondError(res, 403, 'Forbidden', 'No developer profile for this session');
+  }
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders?.();
 
-  for (const ev of progressBus.lastEvents) {
+  for (const ev of progressBus.lastEventsFor(developerId)) {
     res.write(`data: ${JSON.stringify(ev)}\n\n`);
   }
 
-  const unsubscribe = progressBus.subscribe((event) => {
+  const unsubscribe = progressBus.subscribeForDeveloper(developerId, (event) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   });
 
@@ -1139,7 +1164,7 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
 
       linkedinImportInProgress = true;
       linkedinImportRunId = runId;
-      progressBus.start(runId, { job: "linkedin", label: "LinkedIn import started" });
+      progressBus.start(runId, { job: "linkedin", label: "LinkedIn import started", developerId });
       await startJobRun({
         runId,
         jobType: "linkedin",
@@ -1212,8 +1237,9 @@ app.get('/sync', requireLogin, async (req, res) => {
     }
     res.json({ status: 'Sync started', runId: started.runId });
   } catch (err) {
-    const status = err?.response?.status ?? 500;
-    const details = err?.response?.data ?? err?.message ?? String(err);
+    const status =
+      process.env.NODE_ENV === 'production' ? 500 : (err?.response?.status ?? 500);
+    const details = clientSafeUpstreamDetails(err, 'GitHub sync failed');
     res.status(status).json({
       error: 'GitHub sync failed',
       status,

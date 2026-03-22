@@ -10,6 +10,7 @@ const {
   omitIdDeveloperSort,
   safeJson,
 } = require("../utils/prismaJson");
+const { sanitizeDeveloperForClient } = require("../utils/developerApiSanitize");
 
 const router = express.Router();
 
@@ -73,9 +74,15 @@ router.get("/data/profile", requireLogin, async (req, res) => {
   try {
     const developer = await prisma.developer.findUnique({
       where: { id: developerId },
-      omit: omitId,
+      include: {
+        developerFacebookAuthData: true,
+        developerTwitterAuthData: true,
+      },
     });
-    res.json(developer);
+    if (!developer) {
+      return respondError(res, 404, "No developer record", "Run GitHub sync first");
+    }
+    res.json(sanitizeDeveloperForClient(developer));
   } catch (err) {
     respondError(res, 500, "Failed to fetch profile data", err?.message ?? String(err));
   }

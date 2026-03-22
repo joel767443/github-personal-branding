@@ -1,4 +1,8 @@
 const prisma = require("../db/prisma");
+const {
+  sanitizeJobFailureDetails,
+  sanitizeJobFailureStack,
+} = require("../utils/safeClientError");
 
 async function startJobRun({ runId, jobType, userLogin = null, developerId = null, metadata = null }) {
   await prisma.jobRun.upsert({
@@ -44,8 +48,8 @@ async function failJobRun({ runId, message, code = null, details = null, stack =
         runId,
         code,
         message: String(message ?? "Unknown failure"),
-        details,
-        stack: stack ? String(stack) : null,
+        details: sanitizeJobFailureDetails(details),
+        stack: sanitizeJobFailureStack(stack),
       },
     }),
     prisma.jobRun.update({

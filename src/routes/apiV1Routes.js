@@ -13,6 +13,7 @@ const { stripDeveloperSecretsDeep } = require("../utils/developerApiSanitize");
 const detectTechStacks = require("../jobs/detectTechStacks");
 const detectDeveloperArchitectures = require("../jobs/detectDeveloperArchitectures");
 const { assertCanRunPaidJobs } = require("../services/subscriptionAccess");
+const { clientSafeUpstreamDetails } = require("../utils/safeClientError");
 
 const router = express.Router();
 
@@ -191,7 +192,7 @@ router.post("/me/actions/detect-tech-stacks", async (req, res) => {
       return respondError(res, 402, "Subscription required", err?.message ?? String(err));
     }
     const status = err?.response?.status ?? 500;
-    const details = err?.response?.data ?? err?.message ?? String(err);
+    const details = clientSafeUpstreamDetails(err, "Tech stack detection failed");
     respondError(res, status, "Tech stack detection failed", details);
   }
 });
@@ -215,7 +216,7 @@ router.post("/me/actions/detect-architectures", async (req, res) => {
       return respondError(res, 402, "Subscription required", err?.message ?? String(err));
     }
     const status = err?.response?.status ?? 500;
-    const details = err?.response?.data ?? err?.message ?? String(err);
+    const details = clientSafeUpstreamDetails(err, "Architecture detection failed");
     respondError(res, status, "Architecture detection failed", details);
   }
 });
