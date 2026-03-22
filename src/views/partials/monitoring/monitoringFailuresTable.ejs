@@ -1,6 +1,48 @@
 <div class="dataPagePanel">
-  <div class="tableScroll">
-    <%- include("../_dataTable", { rows: failures, columnLabel }) %>
-  </div>
+  <% if (!Array.isArray(failures) || failures.length === 0) { %>
+    <div class="muted">No failures recorded.</div>
+  <% } else { %>
+    <div class="tableScroll">
+      <table class="dataTable monitoringFailuresTable">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Message</th>
+            <th>Job</th>
+            <th>User</th>
+            <th>Stack</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for (const f of failures) { %>
+            <% const run = f?.run; %>
+            <tr>
+              <td class="monitoringFailuresTime"><%= formatDateTime(f?.occurredAt) %></td>
+              <td class="monitoringFailuresMessage"><%= f?.message ?? "" %></td>
+              <td>
+                <% if (run) { %>
+                  <span class="monoCell"><%= run.jobType ?? "" %></span>
+                  <% if (run.status) { %>
+                    <% const st = String(run.status).toLowerCase(); %>
+                    <% let jb = "jobStatusBadge"; %>
+                    <% if (st === "running") { jb += " jobStatusBadge--running"; } else if (st === "completed") { jb += " jobStatusBadge--completed"; } else if (st === "failed") { jb += " jobStatusBadge--failed"; } %>
+                    <span class="<%= jb %>"><%= run.status %></span>
+                  <% } %>
+                <% } %>
+              </td>
+              <td><%= run?.userLogin ?? "" %></td>
+              <td class="monitoringFailuresStack">
+                <% if (f?.stack) { %>
+                  <pre class="failureStackPre"><%= f.stack %></pre>
+                <% } else { %>
+                  <span class="muted">—</span>
+                <% } %>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
   <%- include("../_pagination", { pagination }) %>
 </div>

@@ -1,0 +1,58 @@
+<% const h = health || {}; %>
+<% const sync = h.lastSync; %>
+<% const li = h.lastLinkedin; %>
+<div class="healthPanel">
+  <div class="healthCard">
+    <div class="healthCardLabel">Last GitHub sync</div>
+    <% if (sync) { %>
+      <% const st = String(sync.status ?? "").toLowerCase(); %>
+      <% let badge = "jobStatusBadge"; %>
+      <% if (st === "running") { badge += " jobStatusBadge--running"; } else if (st === "completed") { badge += " jobStatusBadge--completed"; } else if (st === "failed") { badge += " jobStatusBadge--failed"; } %>
+      <div class="healthCardRow">
+        <span class="<%= badge %>"><%= sync.status ?? "" %></span>
+      </div>
+      <div class="healthCardMeta">Started <%= formatDateTime(sync.startedAt) %></div>
+      <% if (sync.finishedAt) { %>
+        <div class="healthCardMeta">Finished <%= formatDateTime(sync.finishedAt) %></div>
+      <% } %>
+      <% if (sync.summary) { %>
+        <div class="healthCardSummary"><%= sync.summary %></div>
+      <% } %>
+    <% } else { %>
+      <div class="muted">No sync job has run yet.</div>
+    <% } %>
+  </div>
+
+  <div class="healthCard">
+    <div class="healthCardLabel">Last LinkedIn import</div>
+    <% if (li) { %>
+      <% const st = String(li.status ?? "").toLowerCase(); %>
+      <% let badge = "jobStatusBadge"; %>
+      <% if (st === "running") { badge += " jobStatusBadge--running"; } else if (st === "completed") { badge += " jobStatusBadge--completed"; } else if (st === "failed") { badge += " jobStatusBadge--failed"; } %>
+      <div class="healthCardRow">
+        <span class="<%= badge %>"><%= li.status ?? "" %></span>
+      </div>
+      <div class="healthCardMeta">Started <%= formatDateTime(li.startedAt) %></div>
+      <% if (li.finishedAt) { %>
+        <div class="healthCardMeta">Finished <%= formatDateTime(li.finishedAt) %></div>
+      <% } %>
+      <% if (li.summary) { %>
+        <div class="healthCardSummary"><%= li.summary %></div>
+      <% } %>
+    <% } else { %>
+      <div class="muted">No LinkedIn import has run yet.</div>
+    <% } %>
+  </div>
+
+  <div class="healthCard healthCard--stat">
+    <div class="healthCardLabel">Failures (24 hours)</div>
+    <div class="healthStatValue"><%= Number(h.failures24h ?? 0) %></div>
+    <div class="healthCardMeta">Recorded in the rolling 24h window</div>
+  </div>
+
+  <div class="healthCard healthCard--stat">
+    <div class="healthCardLabel">Running jobs</div>
+    <div class="healthStatValue"><%= Number(h.runningJobs ?? 0) %></div>
+    <div class="healthCardMeta">Currently in <span class="monoCell">running</span> status</div>
+  </div>
+</div>

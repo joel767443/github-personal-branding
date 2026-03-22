@@ -1,0 +1,35 @@
+<div class="dataPagePanel monitoringEventsPanel">
+  <div class="muted monitoringEventsToolbar">Logged steps for this job run (oldest first).</div>
+  <% if (!Array.isArray(events) || events.length === 0) { %>
+    <div class="muted">No events for this run.</div>
+  <% } else { %>
+    <div class="tableScroll">
+      <table class="dataTable monitoringEventsTable">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>Level</th>
+            <th>Event</th>
+            <th>Payload</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% for (const ev of events) { %>
+            <% const lv = String(ev?.level ?? "info").toLowerCase(); %>
+            <% let lvlClass = "eventLevelBadge eventLevelBadge--info"; %>
+            <% if (lv === "warn" || lv === "warning") { lvlClass = "eventLevelBadge eventLevelBadge--warn"; } else if (lv === "error") { lvlClass = "eventLevelBadge eventLevelBadge--error"; } %>
+            <tr>
+              <td class="monitoringEventsTime"><%= formatDateTime(ev?.createdAt) %></td>
+              <td><span class="<%= lvlClass %>"><%= ev?.level ?? "" %></span></td>
+              <td class="monitoringEventsLabel"><%= ev?.label ?? "" %></td>
+              <td class="monitoringEventsPayload">
+                <pre class="eventPayloadPre"><%= formatJson(ev?.payload) %></pre>
+              </td>
+            </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+  <%- include("../_pagination", { pagination }) %>
+</div>

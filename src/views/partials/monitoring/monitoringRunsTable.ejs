@@ -6,11 +6,8 @@
       <table class="dataTable monitoringRunsTable">
         <thead>
           <tr>
-            <th>Run ID</th>
             <th>Job Type</th>
             <th>Status</th>
-            <th>User</th>
-            <th>Developer ID</th>
             <th>Started</th>
             <th>Finished</th>
             <th>Summary</th>
@@ -27,11 +24,8 @@
               else if (st === "failed") badge += " jobStatusBadge--failed";
             %>
             <tr>
-              <td class="monoCell"><%= r?.id ?? "" %></td>
               <td><%= r?.jobType ?? "" %></td>
               <td><span class="<%= badge %>"><%= r?.status ?? "" %></span></td>
-              <td><%= r?.userLogin ?? "" %></td>
-              <td class="monoCell"><%= r?.developerId ?? "" %></td>
               <td><%= formatDateTime(r?.startedAt) %></td>
               <td><%= formatDateTime(r?.finishedAt) %></td>
               <td class="monitoringSummaryCell"><%= r?.summary ?? "" %></td>

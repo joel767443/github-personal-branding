@@ -20,11 +20,47 @@ function columnLabel(key) {
     .join(" ");
 }
 
+/** Renders as `2023/02/24 07:19:19 UTC` (fixed offset, easy to scan). */
 function formatDateTime(v) {
   if (!v) return "";
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return String(v);
-  return d.toLocaleString();
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const h = String(d.getUTCHours()).padStart(2, "0");
+  const min = String(d.getUTCMinutes()).padStart(2, "0");
+  const s = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${y}/${mo}/${day} ${h}:${min}:${s} UTC`;
+}
+
+/**
+ * Used by generic `_dataTable`: format Date / ISO strings; keep other objects as JSON.
+ */
+function formatDataTableCell(value) {
+  if (value == null) return { kind: "empty" };
+  if (value instanceof Date) return { kind: "text", text: formatDateTime(value) };
+  if (typeof value === "string") {
+    const t = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}T/.test(t) || /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(t)) {
+      const parsed = new Date(t);
+      if (!Number.isNaN(parsed.getTime())) return { kind: "text", text: formatDateTime(t) };
+    }
+    return { kind: "text", text: value };
+  }
+  if (typeof value === "object") return { kind: "json", value };
+  return { kind: "text", text: String(value) };
+}
+
+/** Pretty-print JSON or primitives for read-only display (events payload, etc.). */
+function formatJson(value) {
+  if (value == null || value === undefined) return "—";
+  try {
+    if (typeof value === "object") return JSON.stringify(value, null, 2);
+    return String(value);
+  } catch {
+    return String(value);
+  }
 }
 
 /** Query param keys for per-tab pagination (portfolio, skills, endorsements, monitoring). */
@@ -39,6 +75,7 @@ const PAGINATION_PARAMS = {
   recommendations: "recommendationsPage",
   monitoringRuns: "runsPage",
   monitoringFailures: "failuresPage",
+  monitoringEvents: "eventsPage",
 };
 
 function parsePage(raw, fallback = 1) {
@@ -72,6 +109,8 @@ function paginateArray(items, { page, pageSize }) {
 module.exports = {
   columnLabel,
   formatDateTime,
+  formatDataTableCell,
+  formatJson,
   PAGINATION_PARAMS,
   parsePage,
   paginateArray,

@@ -1,6 +1,11 @@
 const express = require("express");
 const requireLogin = require("../middleware/requireLogin");
-const { columnLabel, formatDateTime } = require("../services/viewHelpers");
+const {
+  columnLabel,
+  formatDateTime,
+  formatDataTableCell,
+  formatJson,
+} = require("../services/viewHelpers");
 const viewsDataService = require("../services/viewsDataService");
 
 const router = express.Router();
@@ -73,7 +78,7 @@ router.get("/education", requireLogin, async (req, res) => {
 router.get("/skills", requireLogin, async (req, res) => {
   try {
     const model = await viewsDataService.getSkillsTabsViewModel(req, req.query.tab);
-    res.render("partials/skills", { ...model, columnLabel, formatDateTime });
+    res.render("partials/skills", { ...model, columnLabel, formatDateTime, formatDataTableCell });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render skills" });
   }
@@ -82,7 +87,12 @@ router.get("/skills", requireLogin, async (req, res) => {
 router.get("/endorsements", requireLogin, async (req, res) => {
   try {
     const model = await viewsDataService.getEndorsementsTabsViewModel(req, req.query.tab);
-    res.render("partials/endorsements", { ...model, columnLabel, formatDateTime });
+    res.render("partials/endorsements", {
+      ...model,
+      columnLabel,
+      formatDateTime,
+      formatDataTableCell,
+    });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render endorsements" });
   }
@@ -118,10 +128,7 @@ router.get("/monitoring/runs", requireLogin, async (req, res) => {
 router.get("/monitoring/health", requireLogin, async (req, res) => {
   try {
     const model = await viewsDataService.getMonitoringHealthViewModel(req);
-    res.render("partials/_dataTable", {
-      rows: [model.health],
-      columnLabel,
-    });
+    res.render("partials/monitoring/monitoringHealthPanel", { ...model, formatDateTime });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render health" });
   }
@@ -138,10 +145,12 @@ router.get("/monitoring/failures", requireLogin, async (req, res) => {
 
 router.get("/monitoring/runs/:runId/events", requireLogin, async (req, res) => {
   try {
-    const model = await viewsDataService.getMonitoringEventsViewModel(req.params.runId, {
-      limit: req.query.limit,
+    const model = await viewsDataService.getMonitoringEventsViewModel(req.params.runId, req);
+    res.render("partials/monitoring/monitoringRunEvents", {
+      ...model,
+      formatDateTime,
+      formatJson,
     });
-    res.render("partials/_dataTable", { rows: model.events, columnLabel });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render events" });
   }

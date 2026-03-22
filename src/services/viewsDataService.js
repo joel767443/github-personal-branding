@@ -5,6 +5,7 @@ const { parsePage, paginateArray, PAGINATION_PARAMS } = require("./viewHelpers")
 const {
   listJobRuns,
   getJobEvents,
+  countJobEvents,
   listFailures,
   healthSnapshot,
   countJobRuns,
@@ -461,9 +462,26 @@ async function getMonitoringFailuresViewModel(req) {
   };
 }
 
-async function getMonitoringEventsViewModel(runId, { limit }) {
-  const events = await getJobEvents(String(runId), { limit });
-  return { events: Array.isArray(events) ? events : [] };
+async function getMonitoringEventsViewModel(runId, req) {
+  const rid = String(runId);
+  const pageSize = PAGE_SIZE_TABLE;
+  const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringEvents] ?? req.query.page);
+  const total = await countJobEvents(rid);
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pageRaw, totalPages);
+  const skip = (page - 1) * pageSize;
+  const events = await getJobEvents(rid, { limit: pageSize, skip });
+  return {
+    runId: rid,
+    events: Array.isArray(events) ? events : [],
+    pagination: {
+      paramName: PAGINATION_PARAMS.monitoringEvents,
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
+  };
 }
 
 module.exports = {

@@ -583,8 +583,19 @@ document.addEventListener("click", async (ev) => {
     if (param === "recommendationsPage") u.searchParams.set("tab", "recommendations");
   }
   if (route.page === "monitoring") {
-    if (param === "runsPage") u.searchParams.set("tab", "runs");
-    if (param === "failuresPage") u.searchParams.set("tab", "failures");
+    if (param === "runsPage") {
+      u.searchParams.set("tab", "runs");
+      u.searchParams.delete("runEvents");
+      u.searchParams.delete("eventsPage");
+    }
+    if (param === "failuresPage") {
+      u.searchParams.set("tab", "failures");
+      u.searchParams.delete("runEvents");
+      u.searchParams.delete("eventsPage");
+    }
+    if (param === "eventsPage") {
+      u.searchParams.set("tab", "runs");
+    }
   }
   history.pushState(null, "", u.toString());
   syncSidebarActiveFromPath();
@@ -654,7 +665,20 @@ function currentDataRoute() {
       educationTab: page,
     };
   }
-  if (["skills", "developer-tech-stacks", "architectures"].includes(page)) {
+  if (page === "skills") {
+    const url = new URL(window.location.href);
+    const tab = url.searchParams.get("tab");
+    const allowed = new Set(["skills", "developer-tech-stacks", "architectures"]);
+    const skillsTab = allowed.has(tab) ? tab : "skills";
+    return {
+      api: "/data/skills",
+      title: "Skills",
+      kind: "data",
+      page: "skills",
+      skillsTab,
+    };
+  }
+  if (page === "developer-tech-stacks" || page === "architectures") {
     return {
       api: "/data/skills",
       title: "Skills",
@@ -663,7 +687,20 @@ function currentDataRoute() {
       skillsTab: page,
     };
   }
-  if (["endorsements", "recommendations"].includes(page)) {
+  if (page === "endorsements") {
+    const url = new URL(window.location.href);
+    const tab = url.searchParams.get("tab");
+    const allowed = new Set(["endorsements", "recommendations"]);
+    const endorsementsTab = allowed.has(tab) ? tab : "endorsements";
+    return {
+      api: "/data/endorsements",
+      title: "Endorsements",
+      kind: "data",
+      page: "endorsements",
+      endorsementsTab,
+    };
+  }
+  if (page === "recommendations") {
     return {
       api: "/data/endorsements",
       title: "Endorsements",
@@ -768,6 +805,8 @@ async function loadDataPage() {
           if (!tab) return;
           const u = new URL(window.location.href);
           u.searchParams.set("tab", tab);
+          u.searchParams.delete("runEvents");
+          u.searchParams.delete("eventsPage");
           if (tab === "runs") {
             u.searchParams.delete("failuresPage");
           } else if (tab === "failures") {
@@ -785,10 +824,20 @@ async function loadDataPage() {
         if (actionBtn) {
           const runId = actionBtn.getAttribute("data-run-id");
           if (!runId) return;
-          setLoadingState(tabContent, `Loading events for ${runId}…`);
+          const u = new URL(window.location.href);
+          u.searchParams.set("tab", "runs");
+          u.searchParams.set("runEvents", runId);
+          u.searchParams.delete("eventsPage");
+          history.pushState(null, "", u.toString());
+          syncSidebarActiveFromPath();
+          setTabActive("runs");
+          setLoadingState(tabContent, "Loading events…");
           try {
+            const q = new URL(window.location.href).search.slice(1);
             tabContent.innerHTML = await getHtml(
-              `/views/monitoring/runs/${encodeURIComponent(runId)}/events?limit=200`,
+              q
+                ? `/views/monitoring/runs/${encodeURIComponent(runId)}/events?${q}`
+                : `/views/monitoring/runs/${encodeURIComponent(runId)}/events`,
             );
           } catch (err) {
             setErrorState(tabContent, err?.message || String(err));
@@ -796,7 +845,23 @@ async function loadDataPage() {
         }
       };
 
-      await loadTab(activeTab);
+      const pageUrl = new URL(window.location.href);
+      const runEventsId = pageUrl.searchParams.get("runEvents");
+      if (runEventsId && tabContent) {
+        setTabActive("runs");
+        try {
+          const q = pageUrl.search.slice(1);
+          tabContent.innerHTML = await getHtml(
+            q
+              ? `/views/monitoring/runs/${encodeURIComponent(runEventsId)}/events?${q}`
+              : `/views/monitoring/runs/${encodeURIComponent(runEventsId)}/events`,
+          );
+        } catch (err) {
+          setErrorState(tabContent, err?.message || String(err));
+        }
+      } else {
+        await loadTab(activeTab);
+      }
     } else if (route?.page === "portfolio") {
       const initialTab = route?.portfolioTab ?? "repos";
       const sp = new URLSearchParams(window.location.search);

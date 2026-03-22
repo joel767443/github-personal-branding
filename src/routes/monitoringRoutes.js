@@ -24,7 +24,10 @@ router.get("/monitoring/runs", requireLogin, async (req, res) => {
 
 router.get("/monitoring/runs/:runId/events", requireLogin, async (req, res) => {
   try {
-    const events = await getJobEvents(String(req.params.runId), { limit: req.query.limit });
+    const events = await getJobEvents(String(req.params.runId), {
+      limit: req.query.limit,
+      skip: req.query.skip,
+    });
     res.json(events);
   } catch (err) {
     respondError(res, 500, "Failed to fetch run events", err?.message ?? String(err));

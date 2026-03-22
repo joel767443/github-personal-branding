@@ -16,7 +16,14 @@
         <tr>
           <% for (const c of columns) { %>
             <% const value = row?.[c]; %>
-            <% if (value == null) { %>
+            <% const cell = typeof formatDataTableCell === "function" ? formatDataTableCell(value) : null; %>
+            <% if (cell && cell.kind === "empty") { %>
+              <td></td>
+            <% } else if (cell && cell.kind === "text") { %>
+              <td><%= cell.text %></td>
+            <% } else if (cell && cell.kind === "json") { %>
+              <td><pre><%= JSON.stringify(cell.value, null, 2) %></pre></td>
+            <% } else if (value == null) { %>
               <td></td>
             <% } else if (typeof value === "object") { %>
               <td><pre><%= JSON.stringify(value, null, 2) %></pre></td>

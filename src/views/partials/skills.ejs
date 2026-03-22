@@ -42,7 +42,7 @@
       <% } else { %>
         <div class="dataPagePanel">
           <div class="tableScroll">
-            <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [] }) %>
+            <%- include("_dataTable", { rows: Array.isArray(tabRows[d.key]) ? tabRows[d.key] : [], columnLabel, formatDataTableCell }) %>
           </div>
           <%- include("_pagination", { pagination: d.key === "skills" ? skillsPagination : developerTechStacksPagination }) %>
         </div>

@@ -95,10 +95,18 @@ async function listJobRuns({ jobType, limit = 50, skip = 0 } = {}) {
   });
 }
 
-async function getJobEvents(runId, { limit = 200 } = {}) {
+async function countJobEvents(runId) {
+  if (!runId) return 0;
+  return prisma.jobEvent.count({ where: { runId: String(runId) } });
+}
+
+async function getJobEvents(runId, { limit = 200, skip = 0 } = {}) {
+  const take = Math.min(Math.max(Number(limit) || 200, 1), 1000);
+  const s = Math.max(0, Number(skip) || 0);
   return prisma.jobEvent.findMany({
-    where: { runId },
-    take: Math.min(Math.max(Number(limit) || 200, 1), 1000),
+    where: { runId: String(runId) },
+    take,
+    skip: s,
     orderBy: { createdAt: "asc" },
   });
 }
@@ -151,6 +159,7 @@ module.exports = {
   listJobRuns,
   countJobRuns,
   getJobEvents,
+  countJobEvents,
   listFailures,
   countFailures,
   healthSnapshot,
