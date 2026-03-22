@@ -39,6 +39,31 @@ function setHidden(el, shouldHide) {
   el.classList.toggle("hidden", Boolean(shouldHide));
 }
 
+function applyLinkedinUploadUiVisibility(status) {
+  if (!status) return;
+  const showSetup = status.wizardStep === "setup";
+  const showLogin = status.wizardStep === "login";
+  const isProfilePage = (window.location.pathname || "") === "/profile";
+  const showUploadCard = !showSetup && !showLogin && isProfilePage;
+  const uploadCard = document.getElementById("uploadCard");
+  setHidden(uploadCard, !showUploadCard);
+  const needsLi = Boolean(status.needsLinkedInCredentials);
+  const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
+  if (linkedinCredentialsSection) {
+    setHidden(linkedinCredentialsSection, !needsLi || !showUploadCard);
+  }
+  const linkedinCredentialsMsg = document.getElementById("linkedinCredentialsMsg");
+  if (!needsLi && linkedinCredentialsMsg) {
+    linkedinCredentialsMsg.textContent = "";
+  }
+  const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
+  if (uploadLinkedinZipBtn && showUploadCard) {
+    uploadLinkedinZipBtn.disabled = Boolean(
+      status.syncInProgress || status.linkedinImportInProgress,
+    );
+  }
+}
+
 const loginBtn = document.getElementById("loginBtn");
 const logoutBtn = document.getElementById("logoutBtn");
 const userMenuButton = document.getElementById("userMenuButton");
@@ -101,22 +126,11 @@ const statDeveloperArchitectures = document.getElementById("statDeveloperArchite
 const statRunningJobs = document.getElementById("statRunningJobs");
 const statFailures24h = document.getElementById("statFailures24h");
 const statLastJobStatus = document.getElementById("statLastJobStatus");
-const uploadCard = document.getElementById("uploadCard");
-const linkedinZipInput = document.getElementById("linkedinZip");
-const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
-const uploadStatus = document.getElementById("uploadStatus");
-const linkedinProgressLog = document.getElementById("linkedinProgressLog");
 const dataPageCard = document.getElementById("dataPageCard");
 const dataPageTitle = document.getElementById("dataPageTitle");
 const dataPageSubtitle = document.getElementById("dataPageSubtitle");
 const dataPageContent = document.getElementById("dataPageContent");
 const POST_SETUP_AWAIT_GITHUB_KEY = "pdbs_await_github_after_setup";
-
-const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
-const linkedinCredAccessToken = document.getElementById("linkedinCredAccessToken");
-const linkedinCredPersonId = document.getElementById("linkedinCredPersonId");
-const btnSaveLinkedinCredentials = document.getElementById("btnSaveLinkedinCredentials");
-const linkedinCredentialsMsg = document.getElementById("linkedinCredentialsMsg");
 
 let statusCache = null;
 let progressSSE = null;
@@ -735,6 +749,7 @@ async function loadDataPage() {
     if (route?.page === "profile") {
       dataPageContent.innerHTML = await getHtml("/views/profile");
       await loadSettingsForm();
+      if (statusCache) applyLinkedinUploadUiVisibility(statusCache);
     } else if (route?.page === "experience") {
       dataPageContent.innerHTML = await getHtml(viewsUrl("/views/experience"));
     } else if (route?.page === "projects") {
@@ -969,7 +984,6 @@ async function refreshStatus() {
     const forceUploadUi = route?.kind === "upload";
     const isDashboardRoute = route?.kind === "dashboard";
     const isProfilePage = (window.location.pathname || "") === "/profile";
-    const syncCompleted = Boolean(status?.syncCompleted);
 
     // Dashboard is only `/dashboard`, never on `/`, setup, login, or other routes.
     const showDashboard =
@@ -1033,23 +1047,7 @@ async function refreshStatus() {
         syncCardMountPostSetup.appendChild(syncCard);
       }
     }
-    // LinkedIn ZIP upload: always on `/profile`; on `/dashboard` only after GitHub sync (upload step or completed).
-    // `forceUploadUi` is reserved for a future `/…` route with `kind: "upload"` (currently unused).
-    const showUploadCard =
-      !showSetup &&
-      !showLogin &&
-      (forceUploadUi ||
-        isProfilePage ||
-        (isDashboardRoute && (showUploadStep || syncCompleted)));
-    setHidden(uploadCard, !showUploadCard);
-
-    const needsLi = Boolean(status.needsLinkedInCredentials);
-    if (linkedinCredentialsSection) {
-      setHidden(linkedinCredentialsSection, !needsLi || !showUploadCard);
-    }
-    if (!needsLi && linkedinCredentialsMsg) {
-      linkedinCredentialsMsg.textContent = "";
-    }
+    applyLinkedinUploadUiVisibility(status);
 
     if (!showSetup && status.authenticated) {
       if (topUserAvatar) {
@@ -1139,13 +1137,6 @@ async function refreshStatus() {
       openProgressSSE();
     }
 
-    // ZIP import parses the official export offline; it does not require LinkedIn API creds (those are optional / other flows).
-    if (uploadLinkedinZipBtn && showUploadCard) {
-      uploadLinkedinZipBtn.disabled = Boolean(
-        status.syncInProgress || status.linkedinImportInProgress,
-      );
-    }
-
     syncSidebarActiveFromPath();
   } catch (err) {
     syncState.textContent = `Status failed: ${err.message}`;
@@ -1160,11 +1151,14 @@ function openProgressSSE() {
     try {
       const data = JSON.parse(ev.data);
       const job = data.job ?? "sync";
+      const linkedinProgressLog = document.getElementById("linkedinProgressLog");
       const logTarget = job === "linkedin" ? linkedinProgressLog : progressLog;
       addLog(`[${data.at}] ${data.label}`, null, logTarget ?? progressLog);
       if (data.type === "done") {
         if (job === "linkedin") {
-          uploadStatus.className = "ok";
+          const uploadStatus = document.getElementById("uploadStatus");
+          const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
+          if (uploadStatus) uploadStatus.className = "ok";
           let msg = `Import complete${data.filename ? ` (${data.filename})` : ""}.`;
           if (data.import && typeof data.import === "object") {
             const nonzero = Object.entries(data.import).filter(([, v]) => Number(v) > 0);
@@ -1172,7 +1166,7 @@ function openProgressSSE() {
               msg += ` ${nonzero.map(([k, v]) => `${k}: ${v}`).join(", ")}.`;
             }
           }
-          uploadStatus.textContent = msg;
+          if (uploadStatus) uploadStatus.textContent = msg;
           if (uploadLinkedinZipBtn) uploadLinkedinZipBtn.disabled = false;
         } else {
           syncState.textContent = "Sync complete";
@@ -1182,9 +1176,12 @@ function openProgressSSE() {
       }
       if (data.type === "error") {
         if (job === "linkedin") {
-          uploadStatus.className = "err";
-          uploadStatus.textContent = data.error || "LinkedIn import failed";
-          addLog(data.error || "Unknown import error", "error", linkedinProgressLog ?? progressLog);
+          const uploadStatus = document.getElementById("uploadStatus");
+          const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
+          const liLog = document.getElementById("linkedinProgressLog");
+          if (uploadStatus) uploadStatus.className = "err";
+          if (uploadStatus) uploadStatus.textContent = data.error || "LinkedIn import failed";
+          addLog(data.error || "Unknown import error", "error", liLog ?? progressLog);
           if (uploadLinkedinZipBtn) uploadLinkedinZipBtn.disabled = false;
         } else {
           syncState.textContent = "Sync failed";
@@ -1222,7 +1219,12 @@ async function startSync() {
 }
 
 async function handleLinkedinUpload() {
-  const file = linkedinZipInput.files?.[0];
+  const linkedinZipInput = document.getElementById("linkedinZip");
+  const uploadStatus = document.getElementById("uploadStatus");
+  const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
+  const linkedinProgressLog = document.getElementById("linkedinProgressLog");
+  if (!uploadStatus || !uploadLinkedinZipBtn) return;
+  const file = linkedinZipInput?.files?.[0];
   if (!file) {
     uploadStatus.className = "err";
     uploadStatus.textContent = "Please select a ZIP file first.";
@@ -1300,9 +1302,22 @@ startSyncBtn.addEventListener("click", () => {
   }
   startSync();
 });
-uploadLinkedinZipBtn.addEventListener("click", handleLinkedinUpload);
+document.addEventListener("click", (ev) => {
+  if (ev.target?.closest?.("#uploadLinkedinZipBtn")) {
+    ev.preventDefault();
+    handleLinkedinUpload();
+  }
+  if (ev.target?.closest?.("#btnSaveLinkedinCredentials")) {
+    ev.preventDefault();
+    submitLinkedinCredentials();
+  }
+});
 
 async function submitLinkedinCredentials() {
+  const linkedinCredAccessToken = document.getElementById("linkedinCredAccessToken");
+  const linkedinCredPersonId = document.getElementById("linkedinCredPersonId");
+  const linkedinCredentialsMsg = document.getElementById("linkedinCredentialsMsg");
+  const btnSaveLinkedinCredentials = document.getElementById("btnSaveLinkedinCredentials");
   const at = linkedinCredAccessToken?.value?.trim();
   const pid = linkedinCredPersonId?.value?.trim();
   if (!at) {
@@ -1331,8 +1346,6 @@ async function submitLinkedinCredentials() {
     if (btnSaveLinkedinCredentials) btnSaveLinkedinCredentials.disabled = false;
   }
 }
-
-btnSaveLinkedinCredentials?.addEventListener("click", () => submitLinkedinCredentials());
 
 async function submitGithubPat() {
   const t = githubPatInput?.value?.trim();

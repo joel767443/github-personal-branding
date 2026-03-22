@@ -30,3 +30,36 @@
   </div>
 </div>
 
+<div class="card hidden" id="uploadCard">
+  <h2>Upload LinkedIn Export</h2>
+  <div id="linkedinCredentialsSection" class="hidden">
+    <p class="muted">
+      Enter your LinkedIn API credentials before uploading the export ZIP. Values are stored on your developer
+      record; the access token is encrypted at rest.
+    </p>
+    <div class="row auth-field">
+      <label for="linkedinCredAccessToken">ACCESS_TOKEN</label>
+      <input id="linkedinCredAccessToken" type="password" autocomplete="off" placeholder="LinkedIn OAuth access token" />
+    </div>
+    <div class="row auth-field">
+      <label for="linkedinCredPersonId">PERSON_ID</label>
+      <input id="linkedinCredPersonId" type="text" autocomplete="off" placeholder="LinkedIn person / member id" />
+    </div>
+    <div class="row">
+      <button type="button" id="btnSaveLinkedinCredentials">Save LinkedIn credentials</button>
+    </div>
+    <div id="linkedinCredentialsMsg" class="muted auth-msg" aria-live="polite"></div>
+  </div>
+  <div class="row">
+    <span class="muted">GitHub sync is complete. Upload your LinkedIn ZIP export to continue.</span>
+  </div>
+  <div class="row">
+    <label for="linkedinZip">LinkedIn ZIP file</label>
+    <input id="linkedinZip" type="file" accept=".zip" />
+  </div>
+  <div class="row">
+    <button id="uploadLinkedinZipBtn">Upload ZIP</button>
+  </div>
+  <div id="uploadStatus" class="muted"></div>
+  <div class="log" id="linkedinProgressLog" aria-live="polite"></div>
+</div>
