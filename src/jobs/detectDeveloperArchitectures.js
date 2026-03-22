@@ -58,6 +58,16 @@ const ARCH_KEYWORDS_LOWER = Object.fromEntries(
   Object.entries(ARCH_KEYWORDS).map(([arch, keywords]) => [arch, keywords.map((k) => String(k).toLowerCase())]),
 );
 
+/** `DeveloperArchitecture.name` FKs to `Architecture.name`; rows must exist before linking. */
+async function ensureArchitectureRowsForKeywords() {
+  const names = Object.keys(ARCH_KEYWORDS);
+  if (names.length === 0) return;
+  await prisma.architecture.createMany({
+    data: names.map((name) => ({ name, count: 0 })),
+    skipDuplicates: true,
+  });
+}
+
 async function rebuildArchitectureCatalogFromDeveloperLinks() {
   const grouped = await prisma.developerArchitecture.groupBy({
     by: ["name"],
@@ -198,6 +208,7 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress, devel
     }
   }
   if (devArchitectureRows.length > 0) {
+    await ensureArchitectureRowsForKeywords();
     await prisma.developerArchitecture.createMany({ data: devArchitectureRows });
   }
 

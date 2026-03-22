@@ -16,6 +16,22 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
+/** Merge scores by trimmed name so (repo_id, name) is unique for createMany. */
+function buildRepoTechStackRows(repoId, repoRuleStack) {
+  const byName = new Map();
+  for (const [name, score] of Object.entries(repoRuleStack)) {
+    const key = String(name).trim();
+    if (!key) continue;
+    const n = Number(score);
+    byName.set(key, (byName.get(key) ?? 0) + (Number.isFinite(n) ? n : 0));
+  }
+  return [...byName.entries()].map(([name, score]) => ({
+    repoId,
+    name,
+    score,
+  }));
+}
+
 async function detectTechStacks({ onProgress, developerId } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
   const rules = await prisma.techDetectorRule.findMany();
@@ -108,13 +124,12 @@ async function detectTechStacks({ onProgress, developerId } = {}) {
         }
       }
 
-      const repoRows = Object.entries(repoRuleStack).map(([name, score]) => ({
-        repoId: repo.id,
-        name,
-        score: Number(score),
-      }));
+      const repoRows = buildRepoTechStackRows(repo.id, repoRuleStack);
       if (repoRows.length > 0) {
-        await prisma.repoTechStack.createMany({ data: repoRows });
+        await prisma.repoTechStack.createMany({
+          data: repoRows,
+          skipDuplicates: true,
+        });
       }
     }
 
