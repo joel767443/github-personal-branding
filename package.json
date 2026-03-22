@@ -9,6 +9,7 @@
     "deploy-portfolio:regen": "node scripts/deployPortfolio.js --regenerate",
     "sample-facebook-post": "node scripts/sampleFacebookPost.js",
     "sample-twitter-post": "node scripts/sampleTwitterPost.js",
+    "sample-linkedin-post": "node scripts/sampleLinkedInPost.js",
     "push:origin": "git push origin HEAD"
   },
   "keywords": [],

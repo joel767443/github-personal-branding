@@ -1,11 +1,12 @@
-const { LinkedInPostPayload } = require('../social/payloads/LinkedInPostPayload');
 const { postFacebook } = require('./postFacebook');
 const { postTwitter } = require('./postTwitter');
+const { postLinkedin } = require('./postLinkedin');
 
 /** Platform-specific implementations; each owns auth, payload shape, and API calls. */
 const PLATFORM_POSTERS = {
   facebook: postFacebook,
   twitter: postTwitter,
+  linkedin: postLinkedin,
 };
 
 /**
@@ -25,9 +26,6 @@ async function executeSocialMediaPost({ developerId, platform, payload }) {
   if (run) {
     return run(id, payload ?? {});
   }
-  if (p === 'linkedin') {
-    new LinkedInPostPayload(payload ?? {}).toApiBody();
-  }
   throw new Error(`executeSocialMediaPost: unknown platform "${platform}"`);
 }
 
@@ -35,4 +33,5 @@ module.exports = {
   executeSocialMediaPost,
   postFacebook,
   postTwitter,
+  postLinkedin,
 };
