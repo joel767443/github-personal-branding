@@ -167,6 +167,7 @@ async function listFailures({ limit = 100, skip = 0, developerId } = {}) {
           status: true,
           userLogin: true,
           developerId: true,
+          metadata: true,
         },
       },
     },
@@ -176,13 +177,17 @@ async function listFailures({ limit = 100, skip = 0, developerId } = {}) {
 async function healthSnapshot({ developerId } = {}) {
   const where = developerId != null ? { developerId } : undefined;
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const [lastSync, lastLinkedin, recentFailures, running] = await Promise.all([
+  const [lastSync, lastLinkedin, lastSocial, recentFailures, running] = await Promise.all([
     prisma.jobRun.findFirst({
       where: { jobType: "sync", ...where },
       orderBy: { startedAt: "desc" },
     }),
     prisma.jobRun.findFirst({
       where: { jobType: "linkedin", ...where },
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.jobRun.findFirst({
+      where: { jobType: "social_media", ...where },
       orderBy: { startedAt: "desc" },
     }),
     prisma.jobFailure.count({
@@ -198,6 +203,7 @@ async function healthSnapshot({ developerId } = {}) {
   return {
     lastSync,
     lastLinkedin,
+    lastSocial,
     failures24h: recentFailures,
     runningJobs: running,
   };

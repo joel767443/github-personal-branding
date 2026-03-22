@@ -443,6 +443,7 @@ async function getMonitoringHealthViewModel(req) {
       ? {
           lastSync: null,
           lastLinkedin: null,
+          lastSocial: null,
           failures24h: 0,
           runningJobs: 0,
         }

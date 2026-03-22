@@ -24,7 +24,7 @@
               else if (st === "failed") badge += " jobStatusBadge--failed";
             %>
             <tr>
-              <td><%= r?.jobType ?? "" %></td>
+              <td><%= formatJobTypeLabel(r?.jobType, r?.metadata) %></td>
               <td><span class="<%= badge %>"><%= r?.status ?? "" %></span></td>
               <td><%= formatDateTime(r?.startedAt) %></td>
               <td><%= formatDateTime(r?.finishedAt) %></td>

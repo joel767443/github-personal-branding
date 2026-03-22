@@ -1,4 +1,5 @@
 const prisma = require("../db/prisma");
+const { formatJobTypeLabel } = require("../utils/jobTypeLabels");
 
 const TOP_STACKS = 12;
 const TOP_ARCH = 12;
@@ -62,6 +63,8 @@ async function getDashboardAnalytics(developerId) {
     failures24hCount,
     lastSync,
     lastLinkedin,
+    lastSocial,
+    socialPostsCompleted30d,
     commitsCount,
     developerTechStacksCount,
     developerArchitecturesCount,
@@ -139,6 +142,18 @@ async function getDashboardAnalytics(developerId) {
       where: { ...jobWhere, jobType: "linkedin" },
       orderBy: { startedAt: "desc" },
     }),
+    prisma.jobRun.findFirst({
+      where: { ...jobWhere, jobType: "social_media" },
+      orderBy: { startedAt: "desc" },
+    }),
+    prisma.jobRun.count({
+      where: {
+        ...jobWhere,
+        jobType: "social_media",
+        status: "completed",
+        startedAt: { gte: rangeStart, lte: now },
+      },
+    }),
     prisma.commit.count({
       where: { repo: { developerId } },
     }),
@@ -196,10 +211,17 @@ async function getDashboardAnalytics(developerId) {
       failuresByDay,
       jobStatus: statusGroups.map((g) => ({ status: g.status, count: g._count })),
       jobType: typeGroups.map((g) => ({ jobType: g.jobType, count: g._count })),
+      jobTypeChart: typeGroups.map((g) => ({
+        jobType: g.jobType,
+        count: g._count,
+        label: formatJobTypeLabel(g.jobType, null),
+      })),
       runningJobs: runningJobsCount,
       failures24h: failures24hCount,
       lastSyncStatus: lastSync?.status ?? null,
       lastImportStatus: lastLinkedin?.status ?? null,
+      lastSocialStatus: lastSocial?.status ?? null,
+      socialPosts30d: socialPostsCompleted30d,
       totalRuns: totalJobRuns,
     },
   };

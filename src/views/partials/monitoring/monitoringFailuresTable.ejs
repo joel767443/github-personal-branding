@@ -21,7 +21,7 @@
               <td class="monitoringFailuresMessage"><%= f?.message ?? "" %></td>
               <td>
                 <% if (run) { %>
-                  <span class="monoCell"><%= run.jobType ?? "" %></span>
+                  <span class="monoCell"><%= formatJobTypeLabel(run?.jobType, run?.metadata) %></span>
                   <% if (run.status) { %>
                     <% const st = String(run.status).toLowerCase(); %>
                     <% let jb = "jobStatusBadge"; %>

@@ -1,6 +1,7 @@
 <% const h = health || {}; %>
 <% const sync = h.lastSync; %>
 <% const li = h.lastLinkedin; %>
+<% const social = h.lastSocial; %>
 <div class="healthPanel">
   <div class="healthCard">
     <div class="healthCardLabel">Last GitHub sync</div>
@@ -41,6 +42,27 @@
       <% } %>
     <% } else { %>
       <div class="muted">No LinkedIn import has run yet.</div>
+    <% } %>
+  </div>
+
+  <div class="healthCard">
+    <div class="healthCardLabel">Last social post job</div>
+    <% if (social) { %>
+      <% const st = String(social.status ?? "").toLowerCase(); %>
+      <% let badge = "jobStatusBadge"; %>
+      <% if (st === "running") { badge += " jobStatusBadge--running"; } else if (st === "completed") { badge += " jobStatusBadge--completed"; } else if (st === "failed") { badge += " jobStatusBadge--failed"; } %>
+      <div class="healthCardRow">
+        <span class="<%= badge %>"><%= social.status ?? "" %></span>
+      </div>
+      <div class="healthCardMeta">Started <%= formatDateTime(social.startedAt) %></div>
+      <% if (social.finishedAt) { %>
+        <div class="healthCardMeta">Finished <%= formatDateTime(social.finishedAt) %></div>
+      <% } %>
+      <% if (social.summary) { %>
+        <div class="healthCardSummary"><%= social.summary %></div>
+      <% } %>
+    <% } else { %>
+      <div class="muted">No social post job has run yet.</div>
     <% } %>
   </div>
 

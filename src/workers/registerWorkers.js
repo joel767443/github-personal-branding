@@ -20,6 +20,17 @@ const {
   completeJobRun,
   failJobRun,
 } = require('../services/monitoringService');
+
+/** Safe fields for job_event payload (no message body or tokens). */
+function socialPostEventPayload(platform, result) {
+  const p = String(platform ?? '').toLowerCase();
+  const base = { job: 'social_media', platform: p };
+  if (result && typeof result === 'object') {
+    if (result.postId != null) base.postId = String(result.postId);
+    if (result.success != null) base.success = Boolean(result.success);
+  }
+  return base;
+}
 const { addFrequencyToDate } = require('../services/syncFrequencyHelpers');
 
 function makeProgress(runId, job) {
@@ -101,22 +112,45 @@ function registerWorkers() {
     SOCIAL_MEDIA_QUEUE,
     async (job) => {
       const { runId, developerId, platform, payload } = job.data ?? {};
+      const p = String(platform ?? '').toLowerCase();
       try {
+        if (runId) {
+          await addJobEvent({
+            runId,
+            label: `Social post started (${p})`,
+            payload: { job: 'social_media', platform: p, phase: 'start' },
+          });
+        }
         const result = await executeSocialMediaPost({
           developerId,
           platform,
           payload,
         });
         if (runId) {
+          await addJobEvent({
+            runId,
+            label: 'Post published',
+            payload: socialPostEventPayload(p, result),
+          });
           await completeJobRun({
             runId,
-            summary: 'Social media post complete',
-            metadata: result,
+            summary: `Social post (${p}) complete`,
+            metadata: result && typeof result === 'object' ? result : { platform: p },
           });
         }
         return result;
       } catch (err) {
         if (runId) {
+          await addJobEvent({
+            runId,
+            level: 'error',
+            label: 'Social post failed',
+            payload: {
+              job: 'social_media',
+              platform: p,
+              message: String(err?.message ?? err).slice(0, 500),
+            },
+          });
           await failJobRun({
             runId,
             message: err?.message ?? String(err),

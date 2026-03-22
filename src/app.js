@@ -330,11 +330,14 @@ app.get('/dashboard/stats', requireLogin, async (req, res) => {
           failures24h: 0,
           lastSyncStatus: null,
           lastImportStatus: null,
+          lastSocialStatus: null,
+          socialPosts30d: 0,
         },
       });
     }
 
     const jobWhere = { developerId: devId };
+    const dayAgo30 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const [
       reposCount,
       commitsCount,
@@ -345,6 +348,8 @@ app.get('/dashboard/stats', requireLogin, async (req, res) => {
       failures24hCount,
       lastSync,
       lastLinkedin,
+      lastSocial,
+      socialPosts30d,
     ] = await Promise.all([
       prisma.repo.count({ where: { developerId: devId } }),
       prisma.commit.count({ where: { repo: { developerId: devId } } }),
@@ -366,6 +371,18 @@ app.get('/dashboard/stats', requireLogin, async (req, res) => {
         where: { ...jobWhere, jobType: 'linkedin' },
         orderBy: { startedAt: 'desc' },
       }),
+      prisma.jobRun.findFirst({
+        where: { ...jobWhere, jobType: 'social_media' },
+        orderBy: { startedAt: 'desc' },
+      }),
+      prisma.jobRun.count({
+        where: {
+          ...jobWhere,
+          jobType: 'social_media',
+          status: 'completed',
+          startedAt: { gte: dayAgo30 },
+        },
+      }),
     ]);
 
     return res.json({
@@ -380,6 +397,8 @@ app.get('/dashboard/stats', requireLogin, async (req, res) => {
         failures24h: failures24hCount,
         lastSyncStatus: lastSync?.status ?? null,
         lastImportStatus: lastLinkedin?.status ?? null,
+        lastSocialStatus: lastSocial?.status ?? null,
+        socialPosts30d: socialPosts30d,
       },
     });
   } catch (err) {

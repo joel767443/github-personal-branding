@@ -127,6 +127,7 @@ const statDeveloperTechStacks = document.getElementById("statDeveloperTechStacks
 const statDeveloperArchitectures = document.getElementById("statDeveloperArchitectures");
 const statRunningJobs = document.getElementById("statRunningJobs");
 const statFailures24h = document.getElementById("statFailures24h");
+const statSocialPosts30d = document.getElementById("statSocialPosts30d");
 const statLastJobStatus = document.getElementById("statLastJobStatus");
 const dataPageCard = document.getElementById("dataPageCard");
 const dataPageTitle = document.getElementById("dataPageTitle");
@@ -246,10 +247,13 @@ function renderDashboardCharts(analytics) {
     );
   }
 
-  const typeRows = mon.jobType || [];
-  const tyLabels = typeRows.length ? typeRows.map((r) => r.jobType) : ["No jobs"];
-  const tyData = typeRows.length ? typeRows.map((r) => r.count) : [1];
-  const tyColors = typeRows.length
+  const typeChartRows =
+    Array.isArray(mon.jobTypeChart) && mon.jobTypeChart.length > 0
+      ? mon.jobTypeChart
+      : (mon.jobType || []).map((r) => ({ jobType: r.jobType, count: r.count, label: r.jobType }));
+  const tyLabels = typeChartRows.length ? typeChartRows.map((r) => r.label || r.jobType) : ["No jobs"];
+  const tyData = typeChartRows.length ? typeChartRows.map((r) => r.count) : [1];
+  const tyColors = typeChartRows.length
     ? CHART_COLORS.series.slice(0, Math.max(tyLabels.length, 1))
     : [CHART_COLORS.muted];
 
@@ -437,6 +441,7 @@ function clearDashboard() {
   if (statDeveloperArchitectures) statDeveloperArchitectures.textContent = "";
   if (statRunningJobs) statRunningJobs.textContent = "";
   if (statFailures24h) statFailures24h.textContent = "";
+  if (statSocialPosts30d) statSocialPosts30d.textContent = "";
   if (statLastJobStatus) statLastJobStatus.textContent = "";
 }
 
@@ -603,10 +608,12 @@ async function loadDashboardData() {
     const mon = analytics?.monitoring ?? stats?.monitoring;
     if (statRunningJobs) statRunningJobs.textContent = String(mon?.runningJobs ?? 0);
     if (statFailures24h) statFailures24h.textContent = String(mon?.failures24h ?? 0);
+    if (statSocialPosts30d) statSocialPosts30d.textContent = String(mon?.socialPosts30d ?? 0);
     if (statLastJobStatus) {
       const a = mon?.lastSyncStatus ?? "-";
       const b = mon?.lastImportStatus ?? "-";
-      statLastJobStatus.textContent = `Sync: ${a} · LinkedIn: ${b}`;
+      const c = mon?.lastSocialStatus ?? "-";
+      statLastJobStatus.textContent = `Sync: ${a} · LinkedIn: ${b} · Social: ${c}`;
     }
 
     renderDashboardCharts(analytics);

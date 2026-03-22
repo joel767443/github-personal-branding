@@ -7,6 +7,7 @@ const {
   formatJson,
 } = require("../services/viewHelpers");
 const viewsDataService = require("../services/viewsDataService");
+const { formatJobTypeLabel } = require("../utils/jobTypeLabels");
 
 const router = express.Router();
 
@@ -119,7 +120,7 @@ router.get("/monitoring/shell", requireLogin, async (req, res) => {
 router.get("/monitoring/runs", requireLogin, async (req, res) => {
   try {
     const model = await viewsDataService.getMonitoringRunsViewModel(req);
-    res.render("partials/monitoring/monitoringRunsTable", { ...model, formatDateTime });
+    res.render("partials/monitoring/monitoringRunsTable", { ...model, formatDateTime, formatJobTypeLabel });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render runs" });
   }
@@ -137,7 +138,12 @@ router.get("/monitoring/health", requireLogin, async (req, res) => {
 router.get("/monitoring/failures", requireLogin, async (req, res) => {
   try {
     const model = await viewsDataService.getMonitoringFailuresViewModel(req);
-    res.render("partials/monitoring/monitoringFailuresTable", { ...model, columnLabel, formatDateTime });
+    res.render("partials/monitoring/monitoringFailuresTable", {
+      ...model,
+      columnLabel,
+      formatDateTime,
+      formatJobTypeLabel,
+    });
   } catch (err) {
     res.status(err?.status ?? 500).json({ error: err?.message ?? "Failed to render failures" });
   }

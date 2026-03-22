@@ -96,7 +96,14 @@ async function main() {
   }
 
   const job = await enqueueSocialMediaPost({ developerId, platform: 'facebook', payload });
-  console.log('Enqueued job id:', job.id, 'developerId:', developerId);
+  console.log(
+    'Enqueued job id:',
+    job.id,
+    'monitoring runId:',
+    job.data?.runId,
+    'developerId:',
+    developerId,
+  );
   console.log('Watch the server process (npm start) for worker output.');
 }
 
