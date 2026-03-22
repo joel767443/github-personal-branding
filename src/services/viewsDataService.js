@@ -19,7 +19,7 @@ const {
 
 const PAGE_SIZE_CV = 4;
 const PAGE_SIZE_REPOS_GRID = 16;
-const PAGE_SIZE_TABLE = 4;
+const PAGE_SIZE_TABLE = 15;
 
 async function currentDeveloperId(req) {
   const resolved = await resolveDeveloperFromSession(req);
