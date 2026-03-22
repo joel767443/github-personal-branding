@@ -96,7 +96,10 @@ h3 {
 }
 
 .card { background: #131a32; border: 1px solid #273056; border-radius: 10px; padding: 16px; margin-bottom: 16px; margin: 20px;}
-.card#dataPageCard { border: none; }
+.card#dataPageCard {
+  border: none;
+  --profile-gutter: 18px;
+}
 .card > h2:first-child {
   margin-top: 0;
 }
@@ -170,19 +173,25 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   letter-spacing: 0.02em;
 }
 
-/* Profile page */
+/* Profile page — one horizontal gutter so hero, contact, bio, and meta line up */
 .profilePage {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 .profileHero {
-  padding: 20px 20px 18px;
+  padding: 20px 0 18px;
+  margin: 0;
   border-radius: 12px;
   border: 1px solid #2a3558;
   background: linear-gradient(145deg, rgba(37, 49, 95, 0.45) 0%, rgba(13, 20, 48, 0.92) 55%, #0d1430 100%);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.22);
+  box-sizing: border-box;
 }
 
 .profileHeroMain {
@@ -190,6 +199,9 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 20px;
+  padding: 0 var(--profile-gutter);
+  margin: 0;
+  box-sizing: border-box;
 }
 
 .profileHeroAvatarShell {
@@ -272,8 +284,9 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px 24px;
   margin: 18px 0 0;
-  padding: 14px 0 0;
+  padding: 14px var(--profile-gutter) 0;
   border-top: 1px solid rgba(39, 48, 86, 0.85);
+  box-sizing: border-box;
 }
 
 .profileContactItem {
@@ -310,7 +323,7 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 }
 
 .profileBioPanel {
-  padding: 16px 18px;
+  padding: 16px var(--profile-gutter);
   border-radius: 10px;
   border: 1px solid #273056;
   background: #0f1630;
@@ -348,9 +361,11 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 16px;
-  padding-top: 4px;
+  padding: 4px var(--profile-gutter) 0;
+  margin: 0;
   font-size: var(--pdbs-fs-caption);
   color: var(--pdbs-color-muted);
+  box-sizing: border-box;
 }
 
 .profileMetaItem {
@@ -379,6 +394,25 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 
 .profileUploadCard {
   margin-top: 8px;
+  margin-left: 0;
+  margin-right: 0;
+  box-sizing: border-box;
+}
+
+/* Same horizontal inset as hero/bio (parent .card uses 16px; profile gutter is 18px) */
+#dataPageContent .profileUploadCard {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  padding-left: var(--profile-gutter);
+  padding-right: var(--profile-gutter);
+}
+
+/* Account & billing card when mounted under profile (nested .card; match profile gutter) */
+#dataPageCard #settingsCard {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  padding-left: var(--profile-gutter);
+  padding-right: var(--profile-gutter);
 }
 
 .dashboardAvatarLarge { width: 72px; height: 72px; border-radius: 999px; object-fit: cover; background: #0d1430; border: 1px solid #364070; }
