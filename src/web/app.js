@@ -578,9 +578,9 @@ document.addEventListener("click", async (ev) => {
     if (param === "dtsPage") u.searchParams.set("tab", "developer-tech-stacks");
     if (param === "archPage") u.searchParams.set("tab", "architectures");
   }
-  if (route.page === "endorsements") {
-    if (param === "endorsementsPage") u.searchParams.set("tab", "endorsements");
-    if (param === "recommendationsPage") u.searchParams.set("tab", "recommendations");
+  if (route.page === "endorsements" && param === "endorsementsPage") {
+    u.searchParams.delete("tab");
+    u.searchParams.delete("recommendationsPage");
   }
   if (route.page === "monitoring") {
     if (param === "runsPage") {
@@ -687,26 +687,12 @@ function currentDataRoute() {
       skillsTab: page,
     };
   }
-  if (page === "endorsements") {
-    const url = new URL(window.location.href);
-    const tab = url.searchParams.get("tab");
-    const allowed = new Set(["endorsements", "recommendations"]);
-    const endorsementsTab = allowed.has(tab) ? tab : "endorsements";
+  if (page === "endorsements" || page === "recommendations") {
     return {
       api: "/data/endorsements",
       title: "Endorsements",
       kind: "data",
       page: "endorsements",
-      endorsementsTab,
-    };
-  }
-  if (page === "recommendations") {
-    return {
-      api: "/data/endorsements",
-      title: "Endorsements",
-      kind: "data",
-      page: "endorsements",
-      endorsementsTab: page,
     };
   }
   const title = capitalizePageTitle(
@@ -927,24 +913,21 @@ async function loadDataPage() {
         await loadDataPage();
       };
     } else if (route?.page === "endorsements") {
-      const initialTab = route?.endorsementsTab ?? "endorsements";
-      const sp = new URLSearchParams(window.location.search);
-      sp.set("tab", initialTab);
-      dataPageContent.innerHTML = await getHtml(`/views/endorsements?${sp.toString()}`);
-
-      dataPageContent.onclick = async (ev) => {
-        const btn = ev.target?.closest?.("button[data-endorsement-tab]");
-        if (!btn) return;
-        const tabKey = btn.getAttribute("data-endorsement-tab");
-        if (!tabKey) return;
-        const u = new URL(window.location.href);
-        u.searchParams.set("tab", tabKey);
-        u.searchParams.delete("endorsementsPage");
+      const u = new URL(window.location.href);
+      let cleaned = false;
+      if (u.pathname === "/data/recommendations") {
+        u.pathname = "/data/endorsements";
+        cleaned = true;
+      }
+      if (u.searchParams.has("tab") || u.searchParams.has("recommendationsPage")) {
+        u.searchParams.delete("tab");
         u.searchParams.delete("recommendationsPage");
-        history.pushState(null, "", u.toString());
-        syncSidebarActiveFromPath();
-        await loadDataPage();
-      };
+        cleaned = true;
+      }
+      if (cleaned) history.replaceState(null, "", u.toString());
+
+      const sp = new URLSearchParams(window.location.search);
+      dataPageContent.innerHTML = await getHtml(`/views/endorsements?${sp.toString()}`);
     } else {
       throw new Error(`Unsupported page: ${route?.page ?? "(unknown)"}`);
     }

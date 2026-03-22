@@ -182,7 +182,6 @@ class DeveloperPortfolioPersistence {
               recommenderLastName: row.recommenderLastName ?? null,
               company: row.company ?? null,
               jobTitle: row.jobTitle ?? null,
-              relationship: row.relationship ?? null,
               text: row.text ?? null,
               date: row.date ?? null,
               sortOrder: row.sortOrder,

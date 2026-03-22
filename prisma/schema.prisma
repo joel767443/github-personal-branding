@@ -337,7 +337,6 @@ model DeveloperRecommendation {
   recommenderLastName    String? @map("recommender_last_name")
   jobTitle               String? @map("job_title")
   company                String?
-  relationship           String?
   text                   String?
   date                   String?
   sortOrder              Int     @default(0) @map("sort_order")

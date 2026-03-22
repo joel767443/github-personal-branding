@@ -286,7 +286,6 @@ function buildResumeSnapshotFromLinkedIn({ pick, recordsFor }) {
         recommenderLastName: cell(n, ['last name']),
         company: cell(n, ['company']),
         jobTitle: cell(n, ['job title', 'title']),
-        relationship: cell(n, ['relationship']),
         text: cell(n, ['recommendation', 'recommendation text', 'text', 'content']),
         date: cell(n, ['creation date', 'date', 'created']),
         sortOrder: so++,

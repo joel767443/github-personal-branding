@@ -89,7 +89,6 @@
  * @property {string|null} [recommenderLastName]
  * @property {string|null} [company]
  * @property {string|null} [jobTitle]
- * @property {string|null} [relationship]
  * @property {string|null} [text]
  * @property {string|null} [date]
  * @property {number} sortOrder

@@ -199,50 +199,28 @@ async function getSkillsTabsViewModel(req, activeTab) {
   };
 }
 
-async function getEndorsementsTabsViewModel(req, activeTab) {
+async function getEndorsementsViewModel(req) {
   const developerId = await currentDeveloperId(req);
-  const allowedTabs = new Set(["endorsements", "recommendations"]);
-  const initialTab = normalizeActiveTab(activeTab, allowedTabs, "endorsements");
 
-  const [endorsementsRaw, recommendationsRaw] = await Promise.all([
-    prisma.developerLinkedinReceivedEndorsement.findMany({
-      where: { developerId },
-      orderBy: { sortOrder: "asc" },
-      omit: { ...omitIdDeveloperSort, ...endorsementApiOmit },
-    }),
-    prisma.developerRecommendation.findMany({
-      where: { developerId },
-      orderBy: { sortOrder: "asc" },
-      omit: omitIdDeveloperSort,
-    }),
-  ]);
+  const endorsementsRaw = await prisma.developerLinkedinReceivedEndorsement.findMany({
+    where: { developerId },
+    orderBy: { sortOrder: "asc" },
+    omit: { ...omitIdDeveloperSort, ...endorsementApiOmit },
+  });
 
   const endPr = paginateArray(endorsementsRaw, {
     page: parsePage(req.query[PAGINATION_PARAMS.endorsements]),
     pageSize: PAGE_SIZE_TABLE,
   });
-  const recPr = paginateArray(recommendationsRaw, {
-    page: parsePage(req.query[PAGINATION_PARAMS.recommendations]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
 
   return {
-    activeTab: initialTab,
     endorsements: endPr.slice,
-    recommendations: recPr.slice,
     endorsementsPagination: {
       paramName: PAGINATION_PARAMS.endorsements,
       page: endPr.page,
       pageSize: endPr.pageSize,
       total: endPr.total,
       totalPages: endPr.totalPages,
-    },
-    recommendationsPagination: {
-      paramName: PAGINATION_PARAMS.recommendations,
-      page: recPr.page,
-      pageSize: recPr.pageSize,
-      total: recPr.total,
-      totalPages: recPr.totalPages,
     },
   };
 }
@@ -489,7 +467,7 @@ module.exports = {
   getExperienceViewModel,
   getEducationTabsViewModel,
   getSkillsTabsViewModel,
-  getEndorsementsTabsViewModel,
+  getEndorsementsViewModel,
   getPortfolioTabsViewModel,
   getProjectsViewModel,
   getReposViewModel,
