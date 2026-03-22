@@ -7,10 +7,12 @@ const {
   linkedinQueue,
   SYNC_QUEUE,
   LINKEDIN_QUEUE,
+  SOCIAL_MEDIA_QUEUE,
   queuesEnabled,
 } = require('../queue/jobQueues');
 const { executeSyncPipeline } = require('../jobs/syncPipeline');
 const { executeLinkedinImportPipeline } = require('../jobs/linkedinPipeline');
+const { executeSocialMediaPost } = require('../jobs/executeSocialMediaPost');
 const progressBus = require('../config/progressBus');
 const {
   startJobRun,
@@ -95,6 +97,42 @@ function registerWorkers() {
     { connection, concurrency: Number(process.env.LINKEDIN_QUEUE_CONCURRENCY || 2) },
   );
 
+  new Worker(
+    SOCIAL_MEDIA_QUEUE,
+    async (job) => {
+      const { runId, developerId, platform, payload } = job.data ?? {};
+      try {
+        const result = await executeSocialMediaPost({
+          developerId,
+          platform,
+          payload,
+        });
+        if (runId) {
+          await completeJobRun({
+            runId,
+            summary: 'Social media post complete',
+            metadata: result,
+          });
+        }
+        return result;
+      } catch (err) {
+        if (runId) {
+          await failJobRun({
+            runId,
+            message: err?.message ?? String(err),
+            details: err?.response?.data ?? null,
+            stack: err?.stack ?? null,
+          });
+        }
+        throw err;
+      }
+    },
+    {
+      connection,
+      concurrency: Number(process.env.SOCIAL_MEDIA_QUEUE_CONCURRENCY || 2),
+    },
+  );
+
   cron.schedule('0 * * * *', async () => {
     try {
       const now = new Date();
@@ -138,7 +176,12 @@ function registerWorkers() {
     }
   });
 
-  console.log('BullMQ workers registered (same process):', SYNC_QUEUE, LINKEDIN_QUEUE);
+  console.log(
+    'BullMQ workers registered (same process):',
+    SYNC_QUEUE,
+    LINKEDIN_QUEUE,
+    SOCIAL_MEDIA_QUEUE,
+  );
 }
 
 module.exports = { registerWorkers };
