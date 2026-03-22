@@ -46,6 +46,10 @@ const { syncQueue, linkedinQueue, queuesEnabled } = require('./queue/jobQueues')
 const { registerWorkers } = require('./workers/registerWorkers');
 const stripeService = require('./services/stripeService');
 const { parseSyncFrequency } = require('./services/syncFrequencyHelpers');
+const {
+  resolveFacebookOAuthRedirectUri,
+  facebookGraphApiVersion,
+} = require('./services/facebookOAuth');
 const { respondError } = require('./utils/httpErrors');
 const { sanitizeDeveloperForClient } = require('./utils/developerApiSanitize');
 
@@ -566,6 +570,139 @@ app.get('/auth/github/callback', async (req, res) => {
   }
 });
 
+const FACEBOOK_PAGE_SCOPES = ['pages_show_list', 'pages_manage_posts'].join(',');
+
+app.get('/auth/facebook', async (req, res) => {
+  try {
+    const developerId = req.session?.user?.developerId;
+    if (developerId == null) {
+      return res.redirect(302, '/?facebook=login_required');
+    }
+    const appId = String(process.env.FACEBOOK_APP_ID ?? '').trim();
+    const appSecret = String(process.env.FACEBOOK_APP_SECRET ?? '').trim();
+    if (!appId || !appSecret) {
+      return res.redirect(302, '/dashboard?facebook_error=config');
+    }
+    const graphV = facebookGraphApiVersion();
+    const redirectUri = resolveFacebookOAuthRedirectUri(req);
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthFacebookState = state;
+    req.session.oauthFacebookRedirectUri = redirectUri;
+    const url = new URL(`https://www.facebook.com/${graphV}/dialog/oauth`);
+    url.searchParams.set('client_id', appId);
+    url.searchParams.set('redirect_uri', redirectUri);
+    url.searchParams.set('state', state);
+    url.searchParams.set('scope', FACEBOOK_PAGE_SCOPES);
+    res.redirect(302, url.toString());
+  } catch (err) {
+    respondError(res, 500, 'Facebook OAuth start failed', err?.message ?? String(err));
+  }
+});
+
+app.get('/auth/facebook/callback', async (req, res) => {
+  const fail = (code) => res.redirect(302, `/dashboard?facebook_error=${encodeURIComponent(code)}`);
+  try {
+    const { code, state, error, error_reason: _errorReason, error_description: errorDescription } = req.query;
+    if (error) {
+      const msg = errorDescription ? `${String(error)}: ${String(errorDescription)}` : String(error);
+      return res.redirect(302, `/dashboard?facebook_error=${encodeURIComponent(msg.slice(0, 200))}`);
+    }
+    if (!code || !state || state !== req.session.oauthFacebookState) {
+      return fail('state');
+    }
+    const developerId = req.session?.user?.developerId;
+    if (developerId == null) {
+      return fail('session');
+    }
+    const redirectUri = req.session.oauthFacebookRedirectUri ?? resolveFacebookOAuthRedirectUri(req);
+    delete req.session.oauthFacebookState;
+    delete req.session.oauthFacebookRedirectUri;
+
+    const appId = String(process.env.FACEBOOK_APP_ID ?? '').trim();
+    const appSecret = String(process.env.FACEBOOK_APP_SECRET ?? '').trim();
+    if (!appId || !appSecret) {
+      return fail('config');
+    }
+
+    const graphV = facebookGraphApiVersion();
+    const tokenUrl = new URL(`https://graph.facebook.com/${graphV}/oauth/access_token`);
+    tokenUrl.searchParams.set('client_id', appId);
+    tokenUrl.searchParams.set('redirect_uri', redirectUri);
+    tokenUrl.searchParams.set('client_secret', appSecret);
+    tokenUrl.searchParams.set('code', String(code));
+
+    const tokenResp = await fetch(tokenUrl.toString());
+    const tokenJson = await tokenResp.json();
+    let userAccessToken = tokenJson.access_token;
+    if (!userAccessToken) {
+      return fail('token');
+    }
+
+    const longLivedUrl = new URL(`https://graph.facebook.com/${graphV}/oauth/access_token`);
+    longLivedUrl.searchParams.set('grant_type', 'fb_exchange_token');
+    longLivedUrl.searchParams.set('client_id', appId);
+    longLivedUrl.searchParams.set('client_secret', appSecret);
+    longLivedUrl.searchParams.set('fb_exchange_token', userAccessToken);
+    const llResp = await fetch(longLivedUrl.toString());
+    const llJson = await llResp.json();
+    if (llJson.access_token) {
+      userAccessToken = llJson.access_token;
+    }
+
+    const accountsUrl = new URL(`https://graph.facebook.com/${graphV}/me/accounts`);
+    accountsUrl.searchParams.set('fields', 'id,name,access_token,tasks');
+    accountsUrl.searchParams.set('access_token', userAccessToken);
+    const accResp = await fetch(accountsUrl.toString());
+    const accJson = await accResp.json();
+    const pages = Array.isArray(accJson.data) ? accJson.data : [];
+    const hasManage = (tasks) =>
+      Array.isArray(tasks) &&
+      (tasks.includes('MANAGE') || tasks.includes('CREATE_CONTENT') || tasks.includes('MODERATE'));
+    const pickPage =
+      pages.find((p) => p?.access_token && hasManage(p.tasks)) ||
+      pages.find((p) => p?.access_token) ||
+      null;
+    if (!pickPage?.access_token) {
+      return fail('no_pages');
+    }
+
+    const pageTokenEnc = encryptField(pickPage.access_token);
+    const pageId = String(pickPage.id ?? '').trim();
+    if (!pageId || !pageTokenEnc) {
+      return fail('page');
+    }
+
+    await prisma.developerFacebookAuthData.upsert({
+      where: { developerId },
+      create: {
+        developerId,
+        facebookPageId: pageId,
+        pageAccessTokenEnc: pageTokenEnc,
+      },
+      update: {
+        facebookPageId: pageId,
+        pageAccessTokenEnc: pageTokenEnc,
+      },
+    });
+
+    await prisma.developerSocialIntegration.upsert({
+      where: {
+        developerId_platform: { developerId, platform: 'FACEBOOK' },
+      },
+      create: {
+        developerId,
+        platform: 'FACEBOOK',
+        enabled: true,
+      },
+      update: { enabled: true },
+    });
+
+    return res.redirect(302, '/dashboard?facebook=connected');
+  } catch (err) {
+    return fail(String(err?.message ?? err).slice(0, 120) || 'exception');
+  }
+});
+
 app.get('/api/settings/developer', requireLogin, async (req, res) => {
   try {
     const { developer } = await resolveDeveloperFromSession(req);
@@ -574,7 +711,10 @@ app.get('/api/settings/developer', requireLogin, async (req, res) => {
     }
     const full = await prisma.developer.findUnique({
       where: { id: developer.id },
-      include: { socialIntegrations: { orderBy: { platform: 'asc' } } },
+      include: {
+        socialIntegrations: { orderBy: { platform: 'asc' } },
+        developerFacebookAuthData: true,
+      },
     });
     res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
   } catch (err) {
@@ -653,7 +793,7 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     }
     const full = await prisma.developer.findUnique({
       where: { id: developer.id },
-      include: { socialIntegrations: true },
+      include: { socialIntegrations: true, developerFacebookAuthData: true },
     });
     res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
   } catch (err) {

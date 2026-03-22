@@ -83,7 +83,7 @@ const settingsCardMountDefault = document.getElementById("settingsCardMountDefau
 const settingsCardMountProfile = document.getElementById("settingsCardMountProfile");
 const syncFrequencySelect = document.getElementById("syncFrequencySelect");
 const saveSettingsBtn = document.getElementById("saveSettingsBtn");
-const socialFacebook = document.getElementById("socialFacebook");
+const facebookStatus = document.getElementById("facebookStatus");
 const socialTwitter = document.getElementById("socialTwitter");
 const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
@@ -438,17 +438,51 @@ function clearDashboard() {
   if (statLastJobStatus) statLastJobStatus.textContent = "";
 }
 
+function applyFacebookOAuthFlash() {
+  const u = new URL(window.location.href);
+  const ok = u.searchParams.get("facebook");
+  const err = u.searchParams.get("facebook_error");
+  if (ok === "connected" && settingsMsg) {
+    settingsMsg.textContent = "Facebook connected.";
+  } else if (err && settingsMsg) {
+    let decoded = err;
+    try {
+      decoded = decodeURIComponent(String(err).replace(/\+/g, " "));
+    } catch {
+      decoded = String(err);
+    }
+    settingsMsg.textContent = `Facebook: ${decoded}`;
+  }
+  if (ok || err) {
+    u.searchParams.delete("facebook");
+    u.searchParams.delete("facebook_error");
+    const q = u.searchParams.toString();
+    window.history.replaceState({}, "", q ? `${u.pathname}?${q}` : u.pathname);
+  }
+}
+
 async function loadSettingsForm() {
   if (!syncFrequencySelect) return;
   try {
+    applyFacebookOAuthFlash();
     const data = await getJsonOptional("/api/settings/developer");
     const d = data?.developer;
     if (!d) return;
     syncFrequencySelect.value = d.syncFrequency || "TWO_DAYS";
-    const map = { FACEBOOK: socialFacebook, TWITTER: socialTwitter, LINKEDIN: socialLinkedin };
+    const map = { TWITTER: socialTwitter, LINKEDIN: socialLinkedin };
     for (const row of d.socialIntegrations ?? []) {
       const el = map[row.platform];
       if (el) el.checked = Boolean(row.enabled);
+    }
+    const fb = d.developerFacebookAuthData;
+    if (facebookStatus) {
+      if (fb?.facebookPageConnected && fb?.facebookPageId) {
+        facebookStatus.textContent = `Connected (Page ${fb.facebookPageId})`;
+      } else if (fb?.facebookPageConnected) {
+        facebookStatus.textContent = "Connected";
+      } else {
+        facebookStatus.textContent = "Not connected";
+      }
     }
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
     const deployUrlField = document.getElementById("deployRepoUrlInput");
@@ -1385,7 +1419,6 @@ saveSettingsBtn?.addEventListener("click", async () => {
       body: JSON.stringify({
         syncFrequency: syncFrequencySelect.value,
         socialIntegrations: {
-          FACEBOOK: Boolean(socialFacebook?.checked),
           TWITTER: Boolean(socialTwitter?.checked),
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },

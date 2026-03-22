@@ -127,12 +127,13 @@ model DeveloperSocialIntegration {
   @@map("developer_social_integrations")
 }
 
-/// Facebook Page posting: page id (or username), Page access token, optional last-post timestamp.
+/// Facebook Page posting: page id (or username), Page access token (encrypted at rest), optional last-post timestamp.
 model DeveloperFacebookAuthData {
   id               Int       @id @default(autoincrement())
   developerId      Int       @unique @map("developer_id")
   facebookPageId   String    @map("facebook_page_id")
-  pageAccessToken  String    @map("page_access_token") @db.Text
+  /// Encrypted Page access token (stored in column `page_access_token`).
+  pageAccessTokenEnc String  @map("page_access_token") @db.Text
   lastPostedAt     DateTime? @map("last_posted_at")
 
   developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)

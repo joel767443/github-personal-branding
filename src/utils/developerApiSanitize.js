@@ -8,13 +8,23 @@ function sanitizeDeveloperForClient(dev) {
     githubOauthClientSecretEnc,
     githubPatEnc,
     linkedinAccessTokenEnc,
+    developerFacebookAuthData,
     ...rest
   } = dev;
+  let fbSanitized = null;
+  if (developerFacebookAuthData && typeof developerFacebookAuthData === "object") {
+    const { pageAccessTokenEnc, ...fbRest } = developerFacebookAuthData;
+    fbSanitized = {
+      ...fbRest,
+      facebookPageConnected: Boolean(pageAccessTokenEnc),
+    };
+  }
   return {
     ...rest,
     githubOauthClientSecretConfigured: Boolean(githubOauthClientSecretEnc),
     githubPatConfigured: Boolean(githubPatEnc),
     linkedinAccessTokenConfigured: Boolean(linkedinAccessTokenEnc),
+    developerFacebookAuthData: fbSanitized,
   };
 }
 
