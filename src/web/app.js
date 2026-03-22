@@ -66,7 +66,6 @@ const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
 const deployPortfolioAfterSync = document.getElementById("deployPortfolioAfterSync");
 const githubPatInput = document.getElementById("githubPatInput");
-const deployRepoUrlInput = document.getElementById("deployRepoUrlInput");
 const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
 const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
 const githubPatMsg = document.getElementById("githubPatMsg");
@@ -438,7 +437,8 @@ async function loadSettingsForm() {
       if (el) el.checked = Boolean(row.enabled);
     }
     if (deployPortfolioAfterSync) deployPortfolioAfterSync.checked = d.deployPortfolioAfterSync !== false;
-    if (deployRepoUrlInput) deployRepoUrlInput.value = d.deployRepoUrl ?? "";
+    const deployUrlField = document.getElementById("deployRepoUrlInput");
+    if (deployUrlField) deployUrlField.value = d.deployRepoUrl ?? "";
     if (githubPatConfiguredHint) {
       githubPatConfiguredHint.textContent = d.githubPatConfigured
         ? "A token is saved (paste a new one to replace it)."
@@ -1317,6 +1317,7 @@ saveSettingsBtn?.addEventListener("click", async () => {
   if (!syncFrequencySelect) return;
   if (settingsMsg) settingsMsg.textContent = "Saving…";
   try {
+    const deployUrlEl = document.getElementById("deployRepoUrlInput");
     await getJson("/api/settings/developer", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1328,10 +1329,11 @@ saveSettingsBtn?.addEventListener("click", async () => {
           LINKEDIN: Boolean(socialLinkedin?.checked),
         },
         deployPortfolioAfterSync: Boolean(deployPortfolioAfterSync?.checked),
-        deployRepoUrl: deployRepoUrlInput?.value?.trim() ?? "",
+        deployRepoUrl: deployUrlEl?.value?.trim() ?? "",
       }),
     });
     if (settingsMsg) settingsMsg.textContent = "Saved.";
+    await loadSettingsForm();
   } catch (err) {
     if (settingsMsg) settingsMsg.textContent = err.message || String(err);
   }

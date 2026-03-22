@@ -691,8 +691,9 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     if (body.deployPortfolioAfterSync !== undefined) {
       data.deployPortfolioAfterSync = Boolean(body.deployPortfolioAfterSync);
     }
-    if (body.deployRepoUrl !== undefined) {
-      const u = String(body.deployRepoUrl ?? '').trim();
+    const deployRepoRaw = body.deployRepoUrl ?? body.deploy_repo_url;
+    if (deployRepoRaw !== undefined) {
+      const u = String(deployRepoRaw ?? '').trim();
       data.deployRepoUrl = u || null;
     }
     if (body.githubOauthClientId !== undefined) {
