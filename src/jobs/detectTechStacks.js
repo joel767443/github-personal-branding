@@ -16,10 +16,13 @@ function round2(n) {
   return Math.round(n * 100) / 100;
 }
 
-async function detectTechStacks({ onProgress } = {}) {
+async function detectTechStacks({ onProgress, developerId } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
   const rules = await prisma.techDetectorRule.findMany();
-  const developers = await prisma.developer.findMany();
+  const developers =
+    developerId != null
+      ? (await prisma.developer.findMany({ where: { id: developerId } }))
+      : await prisma.developer.findMany();
   progress("Detecting tech stacks", { totalDevelopers: developers.length, totalRules: rules.length });
 
   for (const developer of developers) {

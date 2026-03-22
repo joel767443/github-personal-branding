@@ -401,14 +401,28 @@ async function getArchitecturesViewModel(req) {
 // -------------------------
 
 async function getMonitoringRunsViewModel(req) {
-  const jobType = req.query.type ? String(req.query.type) : undefined;
+  const resolved = await resolveDeveloperFromSession(req);
+  const developerId = resolved.developer?.id ?? null;
   const pageSize = PAGE_SIZE_TABLE;
   const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringRuns] ?? req.query.page);
-  const total = await countJobRuns({ jobType });
+  if (developerId == null) {
+    return {
+      runs: [],
+      pagination: {
+        paramName: PAGINATION_PARAMS.monitoringRuns,
+        page: 1,
+        pageSize,
+        total: 0,
+        totalPages: 1,
+      },
+    };
+  }
+  const jobType = req.query.type ? String(req.query.type) : undefined;
+  const total = await countJobRuns({ jobType, developerId });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(pageRaw, totalPages);
   const skip = (page - 1) * pageSize;
-  const runs = await listJobRuns({ jobType, limit: pageSize, skip });
+  const runs = await listJobRuns({ jobType, limit: pageSize, skip, developerId });
   return {
     runs: Array.isArray(runs) ? runs : [],
     pagination: {
@@ -421,19 +435,43 @@ async function getMonitoringRunsViewModel(req) {
   };
 }
 
-async function getMonitoringHealthViewModel() {
-  const health = await healthSnapshot();
+async function getMonitoringHealthViewModel(req) {
+  const resolved = await resolveDeveloperFromSession(req);
+  const developerId = resolved.developer?.id ?? null;
+  const health =
+    developerId == null
+      ? {
+          lastSync: null,
+          lastLinkedin: null,
+          failures24h: 0,
+          runningJobs: 0,
+        }
+      : await healthSnapshot({ developerId });
   return { health };
 }
 
 async function getMonitoringFailuresViewModel(req) {
+  const resolved = await resolveDeveloperFromSession(req);
+  const developerId = resolved.developer?.id ?? null;
   const pageSize = PAGE_SIZE_TABLE;
   const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringFailures] ?? req.query.page);
-  const total = await countFailures();
+  if (developerId == null) {
+    return {
+      failures: [],
+      pagination: {
+        paramName: PAGINATION_PARAMS.monitoringFailures,
+        page: 1,
+        pageSize,
+        total: 0,
+        totalPages: 1,
+      },
+    };
+  }
+  const total = await countFailures({ developerId });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(pageRaw, totalPages);
   const skip = (page - 1) * pageSize;
-  const failures = await listFailures({ limit: pageSize, skip });
+  const failures = await listFailures({ limit: pageSize, skip, developerId });
   return {
     failures: Array.isArray(failures) ? failures : [],
     pagination: {
@@ -447,14 +485,26 @@ async function getMonitoringFailuresViewModel(req) {
 }
 
 async function getMonitoringEventsViewModel(runId, req) {
+  const resolved = await resolveDeveloperFromSession(req);
+  const developerId = resolved.developer?.id ?? null;
   const rid = String(runId);
   const pageSize = PAGE_SIZE_TABLE;
   const pageRaw = parsePage(req.query[PAGINATION_PARAMS.monitoringEvents] ?? req.query.page);
-  const total = await countJobEvents(rid);
+  if (developerId == null) {
+    const err = new Error("No developer record");
+    err.status = 403;
+    throw err;
+  }
+  const total = await countJobEvents(rid, { developerId });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const page = Math.min(pageRaw, totalPages);
   const skip = (page - 1) * pageSize;
-  const events = await getJobEvents(rid, { limit: pageSize, skip });
+  const events = await getJobEvents(rid, { limit: pageSize, skip, developerId });
+  if (events === null) {
+    const err = new Error("Forbidden");
+    err.status = 403;
+    throw err;
+  }
   return {
     runId: rid,
     events: Array.isArray(events) ? events : [],

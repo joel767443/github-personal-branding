@@ -15,14 +15,14 @@ const ARCH_KEYWORDS = {
   "Microservices": ["microservice", "microservices", "service mesh", "istio", "linkerd", "docker-compose", "k8s.yaml", "kubernetes", "helm"],
   "Event-Driven Architecture": ["event-driven", "eda", "kafka", "rabbitmq", "pub/sub", "event bus", "event sourcing", "nats", "pulsar"],
   "Serverless Architecture": ["serverless", "lambda", "function as a service", "faas", "aws lambda", "vercel", "netlify functions", "serverless.yml"],
-  "CQRS": ["cqrs", "command query", "command-query responsibility segregation", "read model", "write model"],
+  CQRS: ["cqrs", "command query", "command-query responsibility segregation", "read model", "write model"],
   "Machine Learning Systems": ["ai", "ml", "machine learning", ".ipynb", "tensorflow", "pytorch", "torch", "scikit-learn", "huggingface", "keras"],
   "Multi Tenant SaaS": ["saas", "multi-tenant", "multi tenancy", "tenant id", "tenant isolation"],
-  "Jamstack": ["jamstack", "static site", "static-first", "headless cms", "pre-rendered", "ssg", "next.js static", "gatsby", "hugo"],
+  Jamstack: ["jamstack", "static site", "static-first", "headless cms", "pre-rendered", "ssg", "next.js static", "gatsby", "hugo"],
   "Micro Frontends": ["micro frontend", "micro-frontends", "module federation", "single-spa"],
   "AI-Native Architecture": ["ai-native", "agentic", "multi-agent", "rag", "retrieval augmented", "ai pipeline"],
   "Edge Computing": ["edge computing", "cloudflare workers", "fastly", "vercel edge", "edge functions", "@edge"],
-  "SOA": ["soa", "service-oriented", "esb", "enterprise service bus", "soap"],
+  SOA: ["soa", "service-oriented", "esb", "enterprise service bus", "soap"],
   "Actor Model": ["actor model", "akka", "erlang", "elixir", "orleans", "message-passing"],
   "Data Mesh": ["data mesh", "data lakehouse", "snowflake", "databricks", "data-product"],
   "Zero Trust": ["zero trust", "zta", "micro-segmentation", "identity-aware"],
@@ -58,19 +58,43 @@ const ARCH_KEYWORDS_LOWER = Object.fromEntries(
   Object.entries(ARCH_KEYWORDS).map(([arch, keywords]) => [arch, keywords.map((k) => String(k).toLowerCase())]),
 );
 
-async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}) {
+async function rebuildArchitectureCatalogFromDeveloperLinks() {
+  const grouped = await prisma.developerArchitecture.groupBy({
+    by: ["name"],
+    _sum: { count: true },
+  });
+  await prisma.$transaction(async (tx) => {
+    await tx.architecture.deleteMany();
+    if (grouped.length > 0) {
+      await tx.architecture.createMany({
+        data: grouped.map((g) => ({
+          name: g.name,
+          count: g._sum.count ?? 0,
+        })),
+      });
+    }
+  });
+}
+
+/**
+ * @param {{ branch?: string, onProgress?: function, developerId?: number }} opts
+ * When `developerId` is set, only that tenant's repos are scanned and only their
+ * `developer_architectures` rows are replaced; the global `architectures` catalog is rebuilt from all per-developer rows.
+ */
+async function detectDeveloperArchitectures({ branch = "main", onProgress, developerId } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
   const githubCache = new Map();
-  async function githubForRepoDeveloper(developerId) {
-    const key = developerId ?? "__none__";
+  async function githubForRepoDeveloper(devId) {
+    const key = devId ?? "__none__";
     if (githubCache.has(key)) return githubCache.get(key);
-    const creds = developerId != null ? await getGithubCredentialsForDeveloper(developerId) : null;
+    const creds = devId != null ? await getGithubCredentialsForDeveloper(devId) : null;
     const client = creds?.token ? createGithubClient(creds.token) : getEnvGithubClient();
     githubCache.set(key, client);
     return client;
   }
 
   const repos = await prisma.repo.findMany({
+    where: developerId != null ? { developerId } : undefined,
     select: {
       id: true,
       name: true,
@@ -80,16 +104,26 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
     },
   });
 
-  const architectures = {};
-  const devArchitectures = new Map(); // developerId -> { [arch]: count }
+  if (developerId != null) {
+    await prisma.developerArchitecture.deleteMany({ where: { developerId } });
+  } else {
+    await prisma.developerArchitecture.deleteMany();
+    await prisma.architecture.deleteMany();
+  }
+
+  const devArchitectures = new Map();
   let skipped = 0;
-  progress("Detecting architectures", { totalRepos: repos.length, branch });
+  progress("Detecting architectures", {
+    totalRepos: repos.length,
+    branch,
+    scopedDeveloperId: developerId ?? null,
+  });
 
   for (let idx = 0; idx < repos.length; idx++) {
     const repo = repos[idx];
     const github = await githubForRepoDeveloper(repo.developerId);
 
-    const fullName = repo.fullName || `${repo.name}`; // best-effort
+    const fullName = repo.fullName || `${repo.name}`;
     if (!fullName || !fullName.includes("/")) {
       skipped += 1;
       continue;
@@ -101,7 +135,6 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
       continue;
     }
 
-    // Python logic: include repo name, description, topics, and recursive file list.
     let topics = [];
     try {
       topics = await getRepoTopics(github, owner, repoName);
@@ -113,7 +146,6 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
     try {
       files = await getRepoGitTreeFiles(github, owner, repoName, branch);
     } catch {
-      // fallback to master if requested main is missing
       if (branch === "main") {
         try {
           files = await getRepoGitTreeFiles(github, owner, repoName, "master");
@@ -143,8 +175,6 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
 
     if (detected.size > 0) {
       for (const arch of detected) {
-        architectures[arch] = (architectures[arch] ?? 0) + 1;
-
         if (repo.developerId != null) {
           const devId = repo.developerId;
           const bucket = devArchitectures.get(devId) ?? {};
@@ -154,27 +184,14 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
       }
     }
 
-    // Python logic: gentle throttle.
     await sleep(1000);
   }
 
-  // Persist results
-  await prisma.developerArchitecture.deleteMany();
-  await prisma.architecture.deleteMany();
-
-  const architectureRows = Object.entries(architectures).map(([name, count]) => ({
-    name,
-    count,
-  }));
-  if (architectureRows.length > 0) {
-    await prisma.architecture.createMany({ data: architectureRows });
-  }
-
   const devArchitectureRows = [];
-  for (const [developerId, bucket] of devArchitectures.entries()) {
+  for (const [devId, bucket] of devArchitectures.entries()) {
     for (const [name, count] of Object.entries(bucket)) {
       devArchitectureRows.push({
-        developerId,
+        developerId: devId,
         name,
         count,
       });
@@ -183,14 +200,19 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress } = {}
   if (devArchitectureRows.length > 0) {
     await prisma.developerArchitecture.createMany({ data: devArchitectureRows });
   }
-  progress("Architecture detection complete", { totalRepos: repos.length, detectedArchitectures: architectureRows.length });
+
+  await rebuildArchitectureCatalogFromDeveloperLinks();
+
+  progress("Architecture detection complete", {
+    totalRepos: repos.length,
+    detectedArchitectureNames: devArchitectureRows.length,
+  });
 
   return {
     skipped,
     totalRepos: repos.length,
-    detectedArchitectures: architectureRows.length,
+    detectedArchitectureLinks: devArchitectureRows.length,
   };
 }
 
 module.exports = detectDeveloperArchitectures;
-

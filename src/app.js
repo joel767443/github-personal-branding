@@ -6,15 +6,13 @@ const multer = require('multer');
 const session = require("express-session");
 const crypto = require("crypto");
 const { executeSyncPipeline } = require('./jobs/syncPipeline');
-const detectTechStacks = require('./jobs/detectTechStacks');
-const detectDeveloperArchitectures = require('./jobs/detectDeveloperArchitectures');
 const seedTechDetectorRules = require('./jobs/seedTechDetectorRules');
 const progressBus = require('./config/progressBus');
 const requireLogin = require('./middleware/requireLogin');
 const monitoringRoutes = require('./routes/monitoringRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const viewsRoutes = require('./routes/viewsRoutes');
-const { commitApiOmit, endorsementApiOmit } = require('./constants/apiResponseOmit');
+const apiV1Routes = require('./routes/apiV1Routes');
 const {
   startJobRun,
   addJobEvent,
@@ -49,6 +47,7 @@ const { registerWorkers } = require('./workers/registerWorkers');
 const stripeService = require('./services/stripeService');
 const { parseSyncFrequency } = require('./services/syncFrequencyHelpers');
 const { respondError } = require('./utils/httpErrors');
+const { sanitizeDeveloperForClient } = require('./utils/developerApiSanitize');
 
 function envFlagTrue(name) {
   const v = String(process.env[name] ?? '').toLowerCase().trim();
@@ -87,10 +86,13 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: false,
+    secure: process.env.NODE_ENV === 'production',
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
+if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
 app.use(express.static('src/web'));
 app.use(monitoringRoutes);
 
@@ -108,6 +110,7 @@ app.get('/data/:page', (req, res, next) => {
 });
 
 app.use(dataRoutes);
+app.use('/api/v1', apiV1Routes);
 app.use('/views', viewsRoutes);
 
 ensureUploadsDir();
@@ -139,16 +142,6 @@ let syncInProgress = false;
 let activeRunId = null;
 let linkedinImportInProgress = false;
 let linkedinImportRunId = null;
-
-function sanitizeDeveloperForClient(dev) {
-  if (!dev || typeof dev !== 'object') return dev;
-  const { githubOauthClientSecretEnc, githubPatEnc, ...rest } = dev;
-  return {
-    ...rest,
-    githubOauthClientSecretConfigured: Boolean(githubOauthClientSecretEnc),
-    githubPatConfigured: Boolean(githubPatEnc),
-  };
-}
 
 async function runSyncPipeline(req) {
   if (linkedinImportInProgress) {
@@ -230,94 +223,6 @@ async function runSyncPipeline(req) {
   })();
 
   return { started: true, runId };
-}
-
-// --- Prisma eager-load shapes (avoid runaway recursion) ---
-// Developer detail (used by: /developers and /developers/:id)
-const developerIdentitySelect = {
-  id: true,
-  firstName: true,
-  lastName: true,
-  email: true,
-  mobileNumber: true,
-  headline: true,
-  summary: true,
-  linkedinSummary: true,
-};
-
-const developerDetailInclude = {
-  // Repo-level “allied” data for deep inspection.
-  repos: {
-    include: {
-      commits: { omit: commitApiOmit },
-      languages: true,
-      repoTechStacks: { orderBy: { score: 'desc' } },
-    },
-  },
-  // Developer intelligence tables.
-  developerTechStack: true,
-  developerArchitectures: {
-    include: {
-      architecture: true,
-    },
-  },
-  certifications: { orderBy: { sortOrder: 'asc' } },
-  developerExperiences: { orderBy: { sortOrder: 'asc' } },
-  educations: { orderBy: { sortOrder: 'asc' } },
-  projects: {
-    orderBy: { sortOrder: 'asc' },
-    include: {
-       projectLanguages: { include: { language: true } },
-    },
-  },
-  developerLinkedinSkills: { orderBy: { sortOrder: 'asc' } },
-  developerLinkedinReceivedEndorsements: {
-    orderBy: { sortOrder: 'asc' },
-    omit: endorsementApiOmit,
-  },
-  developerRecommendations: { orderBy: { sortOrder: 'asc' } },
-  developerPublications: { orderBy: { sortOrder: 'asc' } },
-};
-
-// Developer intelligence when embedded under Repo (avoid developer->repos recursion).
-const developerIntelligenceInclude = {
-  developerTechStack: true,
-  developerArchitectures: {
-    include: {
-      architecture: true,
-    },
-  },
-};
-
-const architectureWithDevelopersInclude = {
-  developerArchitectures: {
-    include: {
-      developer: {
-        select: developerIdentitySelect,
-      },
-    },
-  },
-};
-
-function parseIntParam(value) {
-  const n = Number(value);
-  return Number.isInteger(n) ? n : null;
-}
-
-function parseLimitOffset(req) {
-  const limitRaw = req.query.limit;
-  const offsetRaw = req.query.offset;
-
-  const limit =
-    limitRaw === undefined ? 50 : Number(limitRaw);
-  const offset =
-    offsetRaw === undefined ? 0 : Number(offsetRaw);
-
-  if (!Number.isInteger(limit) || limit < 0) return { error: 'Invalid `limit`' };
-  if (!Number.isInteger(offset) || offset < 0) return { error: 'Invalid `offset`' };
-
-  // Keep list responses bounded.
-  return { limit: Math.min(limit, 200), offset };
 }
 
 app.get('/auth/me', (req, res) => {
@@ -1114,8 +1019,8 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
   });
 });
 
-// Trigger sync manually
-app.get('/sync', async (req, res) => {
+// Trigger sync manually (legacy GET; prefer POST /sync/start)
+app.get('/sync', requireLogin, async (req, res) => {
   try {
     const started = await runSyncPipeline(req);
     if (!started.started) {
@@ -1127,297 +1032,6 @@ app.get('/sync', async (req, res) => {
     const details = err?.response?.data ?? err?.message ?? String(err);
     res.status(status).json({
       error: 'GitHub sync failed',
-      status,
-      details,
-    });
-  }
-});
-
-// Get repos
-app.get('/repos', async (req, res) => {
-  const repos = await prisma.repo.findMany({
-    include: {
-      commits: { omit: commitApiOmit },
-      languages: true,
-      repoTechStacks: { orderBy: { score: 'desc' } },
-      developer: {
-        include: developerIntelligenceInclude,
-      },
-    },
-  });
-
-  res.json(repos);
-});
-
-// Developers
-app.get('/developers', async (req, res) => {
-  const parsed = parseLimitOffset(req);
-  if (parsed.error) {
-    return respondError(res, 400, 'Invalid query parameters', { details: parsed.error });
-  }
-
-  try {
-    const developers = await prisma.developer.findMany({
-      take: parsed.limit,
-      skip: parsed.offset,
-      orderBy: { id: 'asc' },
-      include: developerDetailInclude,
-    });
-    res.json(developers);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developers',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/developers/by-email/:email', async (req, res) => {
-  const email = String(req.params.email ?? '').trim();
-  if (!email) return respondError(res, 400, 'Invalid parameter', { param: 'email' });
-
-  try {
-    const developer = await prisma.developer.findUnique({
-      where: { email },
-      include: developerDetailInclude,
-    });
-    if (!developer) return respondError(res, 404, 'Not found', { email });
-    res.json(developer);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developer',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/developers/:id/repos', async (req, res) => {
-  const developerId = parseIntParam(req.params.id);
-  if (developerId == null) {
-    return respondError(res, 400, 'Invalid parameter', { param: 'id', value: req.params.id });
-  }
-
-  try {
-    const developerExists = await prisma.developer.findUnique({
-      where: { id: developerId },
-      select: { id: true },
-    });
-    if (!developerExists) return respondError(res, 404, 'Not found', { id: developerId });
-
-    const repos = await prisma.repo.findMany({
-      where: { developerId },
-      include: {
-        commits: { omit: commitApiOmit },
-        languages: true,
-        repoTechStacks: { orderBy: { score: 'desc' } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(repos);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developer repositories',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/developers/:id/tech-stacks', async (req, res) => {
-  const developerId = parseIntParam(req.params.id);
-  if (developerId == null) {
-    return respondError(res, 400, 'Invalid parameter', { param: 'id', value: req.params.id });
-  }
-
-  try {
-    const developerExists = await prisma.developer.findUnique({
-      where: { id: developerId },
-      select: { id: true },
-    });
-    if (!developerExists) return respondError(res, 404, 'Not found', { id: developerId });
-
-    const techStacks = await prisma.developerTechStack.findMany({
-      where: { developerId },
-      orderBy: { percentage: 'desc' },
-    });
-    res.json(techStacks);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developer tech stacks',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/developers/:id/architectures', async (req, res) => {
-  const developerId = parseIntParam(req.params.id);
-  if (developerId == null) {
-    return respondError(res, 400, 'Invalid parameter', { param: 'id', value: req.params.id });
-  }
-
-  try {
-    const developerExists = await prisma.developer.findUnique({
-      where: { id: developerId },
-      select: { id: true },
-    });
-    if (!developerExists) return respondError(res, 404, 'Not found', { id: developerId });
-
-    const architectures = await prisma.developerArchitecture.findMany({
-      where: { developerId },
-      include: { architecture: true },
-      orderBy: { count: 'desc' },
-    });
-    res.json(architectures);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developer architectures',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/developers/:id', async (req, res) => {
-  const id = parseIntParam(req.params.id);
-  if (id == null) {
-    return respondError(res, 400, 'Invalid parameter', { param: 'id', value: req.params.id });
-  }
-
-  try {
-    const developer = await prisma.developer.findUnique({
-      where: { id },
-      include: developerDetailInclude,
-    });
-    if (!developer) return respondError(res, 404, 'Not found', { id });
-    res.json(developer);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch developer',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-// Repos (detail)
-app.get('/repos/:repoId', async (req, res) => {
-  const repoId = String(req.params.repoId ?? '').trim();
-  if (!repoId) return respondError(res, 400, 'Invalid parameter', { param: 'repoId' });
-
-  try {
-    const repo = await prisma.repo.findUnique({
-      where: { id: repoId },
-      include: {
-        commits: { omit: commitApiOmit },
-        languages: true,
-        repoTechStacks: { orderBy: { score: 'desc' } },
-        developer: { include: developerIntelligenceInclude },
-      },
-    });
-    if (!repo) return respondError(res, 404, 'Not found', { repoId });
-    res.json(repo);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch repo',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-// Architectures
-app.get('/architectures', async (req, res) => {
-  try {
-    const architectures = await prisma.architecture.findMany({
-      include: architectureWithDevelopersInclude,
-      orderBy: { count: 'desc' },
-    });
-    res.json(architectures);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch architectures',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-app.get('/architectures/:name', async (req, res) => {
-  const name = String(req.params.name ?? '').trim();
-  if (!name) return respondError(res, 400, 'Invalid parameter', { param: 'name' });
-
-  try {
-    const architecture = await prisma.architecture.findUnique({
-      where: { name },
-      include: architectureWithDevelopersInclude,
-    });
-    if (!architecture) return respondError(res, 404, 'Not found', { name });
-    res.json(architecture);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch architecture',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-// Tech detector rules
-app.get('/tech-detector-rules', async (req, res) => {
-  try {
-    const rules = await prisma.techDetectorRule.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-    res.json(rules);
-  } catch (err) {
-    respondError(
-      res,
-      500,
-      'Failed to fetch tech detector rules',
-      err?.message ?? String(err),
-    );
-  }
-});
-
-// Detect per-developer tech stacks from repo file contents + saved languages.
-app.get('/detect-tech-stacks', async (req, res) => {
-  try {
-    await detectTechStacks();
-    res.json({ status: "Tech stacks detected" });
-  } catch (err) {
-    const status = err?.response?.status ?? 500;
-    const details = err?.response?.data ?? err?.message ?? String(err);
-    res.status(status).json({
-      error: 'Tech stack detection failed',
-      status,
-      details,
-    });
-  }
-});
-
-// Detect per-developer architectures from repo metadata + file list
-app.get('/detect-architectures', async (req, res) => {
-  try {
-    const branch = req.query.branch ? String(req.query.branch) : undefined;
-    await detectDeveloperArchitectures({ branch: branch ?? "main" });
-    res.json({ status: "Developer architectures detected" });
-  } catch (err) {
-    const status = err?.response?.status ?? 500;
-    const details = err?.response?.data ?? err?.message ?? String(err);
-    res.status(status).json({
-      error: 'Architecture detection failed',
       status,
       details,
     });
@@ -1440,7 +1054,7 @@ const port = Number(process.env.PORT) || 3000;
 
 async function startServer() {
   // Seed detector rules once at startup (only if table is empty).
-  // This keeps `GET /tech-detector-rules` meaningful without requiring env-driven seeding.
+  // This keeps `GET /api/v1/tech-detector-rules` meaningful without requiring env-driven seeding.
   try {
     const count = await prisma.techDetectorRule.count();
     if (count === 0) {
