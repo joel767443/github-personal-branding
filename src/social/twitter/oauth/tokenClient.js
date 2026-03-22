@@ -22,7 +22,9 @@ function basicAuthHeader(clientId, clientSecret) {
 async function exchangeAuthorizationCode({ code, redirectUri, codeVerifier }) {
   const { clientId, clientSecret } = getTwitterClientCredentials();
   if (!clientId || !clientSecret) {
-    throw new Error("Twitter OAuth: TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET not configured");
+    throw new Error(
+      "Twitter OAuth: TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET (or TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET) not configured",
+    );
   }
   const body = new URLSearchParams({
     grant_type: "authorization_code",
@@ -64,7 +66,9 @@ async function exchangeAuthorizationCode({ code, redirectUri, codeVerifier }) {
 async function refreshAccessToken({ refreshToken }) {
   const { clientId, clientSecret } = getTwitterClientCredentials();
   if (!clientId || !clientSecret) {
-    throw new Error("Twitter OAuth: TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET not configured");
+    throw new Error(
+      "Twitter OAuth: TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET (or TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET) not configured",
+    );
   }
   const body = new URLSearchParams({
     grant_type: "refresh_token",

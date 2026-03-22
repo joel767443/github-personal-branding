@@ -1228,7 +1228,7 @@ app.get(['/dashboard', '/profile', '/data/:page', '/monitoring'], (req, res) => 
   res.sendFile(path.join(__dirname, 'web', 'index.html'));
 });
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 80;
 
 async function startServer() {
   // Seed detector rules once at startup (only if table is empty).

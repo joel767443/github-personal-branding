@@ -49,7 +49,7 @@ async function resolveDeveloperId() {
     });
     if (!row) {
       throw new Error(
-        `No developer_twitter_auth_data for DEVELOPER_ID=${id}. Connect X in Settings after setting TWITTER_CLIENT_ID/SECRET.`,
+        `No developer_twitter_auth_data for DEVELOPER_ID=${id}. Connect X in Settings after setting TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET.`,
       );
     }
     return id;

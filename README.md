@@ -40,7 +40,7 @@ Start the server:
 npm start
 ```
 
-The app listens on `PORT` (default **3000**). Open the dashboard at `/dashboard` after signing in with GitHub.
+The app listens on `PORT` (default **80**; set `PORT=3000` for local dev if you cannot bind to 80). Open the dashboard at `/dashboard` after signing in with GitHub. For HTTPS OAuth callbacks in production, set **`PUBLIC_BASE_URL`** (e.g. `https://yourdomain.com`) or **`TWITTER_OAUTH_CALLBACK_URL`** to the full `https://.../auth/twitter/callback` URL.
 
 For local development you can use `npx prisma migrate dev` instead of `migrate deploy`.
 
@@ -48,7 +48,10 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 
 | Variable | Purpose |
 |----------|---------|
-| `PORT` | HTTP port (default `3000`) |
+| `PORT` | HTTP port (default `80`; use `PORT=3000` or similar for local dev if binding to 80 fails) |
+| `PUBLIC_BASE_URL` | Optional public site origin for OAuth redirects, e.g. `https://yourdomain.com` (no trailing slash). Used for X callback when `TWITTER_OAUTH_CALLBACK_URL` is unset. |
+| `FORCE_HTTPS` | If `1` or `true`, OAuth redirect URIs built from the request use `https://` (use behind TLS termination with `TRUST_PROXY`). |
+| `TRUST_PROXY` | Set `1` or `true` when the app sits behind a reverse proxy so `req.protocol` and client IP are correct. |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `GITHUB_TOKEN` | Personal access token for GitHub API (sync jobs); server-wide, not per user |
 
@@ -78,7 +81,9 @@ For sharing to your **own** timeline without API posting, use the dashboard link
 
 ### X (Twitter) (optional)
 
-OAuth 2.0 with PKCE connects a developer’s **X account** for **user-context** API calls. Set **`TWITTER_CLIENT_ID`** and **`TWITTER_CLIENT_SECRET`** from the X Developer Portal (OAuth 2.0 client). Optional: **`TWITTER_OAUTH_CALLBACK_URL`** (defaults to `{origin}/auth/twitter/callback`), **`TWITTER_OAUTH_SCOPES`** (defaults to `tweet.read tweet.write users.read offline.access`).
+OAuth 2.0 with PKCE connects a developer’s **X account** for **user-context** API calls. Set **`TWITTER_CONSUMER_KEY`** and **`TWITTER_CONSUMER_SECRET`** (same values as **API Key** and **API Key Secret** in the X Developer Portal; OAuth 2.0 **Client ID** / **Client Secret** use these). Legacy names **`TWITTER_CLIENT_ID`** / **`TWITTER_CLIENT_SECRET`** are still accepted as fallbacks.
+
+**HTTPS callback URLs:** Prefer **`PUBLIC_BASE_URL`** (e.g. `https://yourdomain.com`, no trailing slash) so the redirect URI is always `https://yourdomain.com/auth/twitter/callback`. Alternatively set **`TWITTER_OAUTH_CALLBACK_URL`** to that full URL. If you terminate TLS in front of Node, set **`TRUST_PROXY=1`** (or `true`) and **`FORCE_HTTPS=1`** so the app builds `https://...` when `PUBLIC_BASE_URL` is unset. Optional: **`TWITTER_OAUTH_SCOPES`** (defaults to `tweet.read tweet.write users.read offline.access`).
 
 Register the same callback URL in the X app settings. Posting requires your X project/access tier to allow **`tweet.write`** (check current X API pricing and rules).
 

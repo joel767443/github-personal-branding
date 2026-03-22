@@ -490,7 +490,7 @@ function applyTwitterOAuthFlash() {
     }
     if (String(decoded).toLowerCase().includes("config")) {
       settingsMsg.textContent =
-        "X (Twitter): server missing TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET. Set them in the environment.";
+        "X (Twitter): server missing TWITTER_CONSUMER_KEY / TWITTER_CONSUMER_SECRET (or TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET). Set them in the environment.";
     } else {
       settingsMsg.textContent = `X (Twitter): ${decoded}`;
     }
