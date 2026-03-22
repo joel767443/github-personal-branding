@@ -49,10 +49,16 @@ async function getProfileViewModel(req) {
 
   const sessionUser = req.session?.user ?? {};
   const fullName = [developer?.firstName, developer?.lastName].filter(Boolean).join(" ");
+  const login =
+    developer?.githubUsername?.trim() ||
+    developer?.githubLogin?.trim() ||
+    (typeof sessionUser?.login === "string" ? sessionUser.login.trim() : "") ||
+    "";
 
   return {
     profile: {
       name: fullName || sessionUser?.login || developer?.email || "",
+      login,
       avatarUrl: developer?.profilePic || sessionUser?.avatarUrl || "",
       email: developer?.email || sessionUser?.email || "",
       phoneNumber: developer?.mobileNumber || "",

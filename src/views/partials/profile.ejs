@@ -1,37 +1,83 @@
-<div class="twoCol">
-  <div>
-    <div class="row profileColumn">
-      <% if (profile?.avatarUrl) { %>
-        <img class="dashboardAvatarLarge" src="<%= profile.avatarUrl %>" alt="Profile avatar" />
-      <% } %>
-      <div><%= profile?.name ?? "" %></div>
-      <div class="muted"><%= profile?.email ?? "" %></div>
-      <div class="muted"><%= profile?.phoneNumber ?? "" %></div>
-      <div class="muted">
-        <%= profile?.hireable == null ? "" : (profile.hireable ? "Hireable: Yes" : "Hireable: No") %>
+<% const p = profile || {}; %>
+<div class="profilePage dataPagePanel">
+  <section class="profileHero" aria-labelledby="profileName">
+    <div class="profileHeroMain">
+      <div class="profileHeroAvatarShell">
+        <% if (p.avatarUrl) { %>
+          <img
+            id="profileAvatar"
+            class="profileHeroAvatar"
+            src="<%= p.avatarUrl %>"
+            alt=""
+            width="112"
+            height="112"
+            decoding="async"
+          />
+        <% } else { %>
+          <img id="profileAvatar" class="profileHeroAvatar hidden" src="" alt="" width="112" height="112" />
+        <% } %>
+      </div>
+      <div class="profileHeroText">
+        <h2 id="profileName" class="profileHeroName"><%= p.name ?? "" %></h2>
+        <% if (p.login) { %>
+          <div id="profileLogin" class="profileHeroLogin mono">@<%= p.login %></div>
+        <% } else { %>
+          <div id="profileLogin" class="profileHeroLogin mono hidden" aria-hidden="true"></div>
+        <% } %>
+        <p id="profileHeadline" class="profileHeroHeadline"><%= p.headline || "—" %></p>
+        <% if (p.hireable != null) { %>
+          <span
+            id="profileHireable"
+            class="profileHireableBadge <%= p.hireable ? "profileHireableBadge--yes" : "profileHireableBadge--no" %>"
+          >
+            <%= p.hireable ? "Open to opportunities" : "Not actively seeking" %>
+          </span>
+        <% } else { %>
+          <span id="profileHireable" class="profileHireableBadge profileHireableBadge--muted hidden"></span>
+        <% } %>
       </div>
     </div>
 
-    <div class="row">
-      <label>Created</label>
-      <div class="muted"><%= profile?.createdAt ? formatDateTime(profile.createdAt) : "" %></div>
-    </div>
-    <div class="row">
-      <label>Updated</label>
-      <div class="muted"><%= profile?.updatedAt ? formatDateTime(profile.updatedAt) : "" %></div>
-    </div>
+    <dl class="profileContactGrid">
+      <div class="profileContactItem">
+        <dt>Email</dt>
+        <dd id="profileEmail"><%= p.email ? p.email : "—" %></dd>
+      </div>
+      <div class="profileContactItem">
+        <dt>Phone</dt>
+        <dd id="profilePhone"><%= p.phoneNumber ? p.phoneNumber : "—" %></dd>
+      </div>
+    </dl>
+  </section>
+
+  <div class="profileBioGrid">
+    <section class="profileBioPanel" aria-labelledby="profile-job-title-heading">
+      <h3 id="profile-job-title-heading" class="profileBioTitle">Job title</h3>
+      <p id="profileJobTitle" class="profileBioBody"><%= p.jobTitle || "—" %></p>
+      <h3 class="profileBioTitle">Bio</h3>
+      <div id="profileSummary" class="profileBioBody profileBioBody--prose"><%= p.summary || "—" %></div>
+    </section>
+    <section class="profileBioPanel" aria-labelledby="profile-li-heading">
+      <h3 id="profile-li-heading" class="profileBioTitle">LinkedIn about</h3>
+      <div id="profileLinkedinSummary" class="profileBioBody profileBioBody--prose"><%= p.linkedinSummary || "—" %></div>
+    </section>
   </div>
 
-  <div>
-    <h3>Job Title</h3>
-    <div class="muted"><%= profile?.summary ?? "" %></div>
-    <h3>Summary</h3>
-    <div class="muted"><%= profile?.linkedinSummary ?? "" %></div>
-  </div>
+  <footer class="profileMetaStrip">
+    <span class="profileMetaItem">
+      <span class="profileMetaLabel">Created</span>
+      <time class="profileMetaValue" datetime="<%= p.createdAt || "" %>"><%= p.createdAt ? formatDateTime(p.createdAt) : "—" %></time>
+    </span>
+    <span class="profileMetaSep" aria-hidden="true"></span>
+    <span class="profileMetaItem">
+      <span class="profileMetaLabel">Updated</span>
+      <time class="profileMetaValue" datetime="<%= p.updatedAt || "" %>"><%= p.updatedAt ? formatDateTime(p.updatedAt) : "—" %></time>
+    </span>
+  </footer>
 </div>
 
-<div class="card hidden" id="uploadCard">
-  <h2>Upload LinkedIn Export</h2>
+<div class="card profileUploadCard hidden" id="uploadCard">
+  <h2>Upload LinkedIn export</h2>
   <div id="linkedinCredentialsSection" class="hidden">
     <p class="muted">
       Enter your LinkedIn API credentials before uploading the export ZIP. Values are stored on your developer
