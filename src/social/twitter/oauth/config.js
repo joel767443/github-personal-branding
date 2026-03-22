@@ -1,3 +1,33 @@
+function normalizeTwitterRedirectUri(u) {
+  const s = String(u ?? "").trim();
+  if (!s) return s;
+  try {
+    const parsed = new URL(s);
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith("/")) {
+      path = path.slice(0, -1);
+    }
+    parsed.pathname = path;
+    return parsed.toString();
+  } catch {
+    return s.replace(/\/+$/, "") || s;
+  }
+}
+
+function resolvePublicProtoForOAuth(req) {
+  const forceHttps =
+    process.env.FORCE_HTTPS === "1" ||
+    process.env.FORCE_HTTPS === "true" ||
+    String(process.env.USE_HTTPS_PUBLIC_URL ?? "").toLowerCase() === "true";
+  if (forceHttps) return "https";
+  const fp = String(req.get("x-forwarded-proto") ?? "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  if (fp === "https" || fp === "http") return fp;
+  return req.protocol === "https" ? "https" : "http";
+}
+
 /**
  * X (Twitter) OAuth 2.0 (Authorization Code with PKCE) configuration.
  * OAuth 2.0 client id/secret in the X portal use the same values as API Key / API Key Secret
@@ -6,18 +36,14 @@
  */
 function resolveTwitterOAuthRedirectUri(req) {
   const explicit = String(process.env.TWITTER_OAUTH_CALLBACK_URL ?? "").trim();
-  if (explicit) return explicit;
+  if (explicit) return normalizeTwitterRedirectUri(explicit);
   const pub = String(process.env.PUBLIC_BASE_URL ?? "").trim().replace(/\/$/, "");
   if (pub) {
-    return `${pub}/auth/twitter/callback`;
+    return normalizeTwitterRedirectUri(`${pub}/auth/twitter/callback`);
   }
-  const forceHttps =
-    process.env.FORCE_HTTPS === "1" ||
-    process.env.FORCE_HTTPS === "true" ||
-    String(process.env.USE_HTTPS_PUBLIC_URL ?? "").toLowerCase() === "true";
-  const proto = forceHttps ? "https" : req.protocol;
+  const proto = resolvePublicProtoForOAuth(req);
   const host = req.get("host") || "";
-  return `${proto}://${host}/auth/twitter/callback`;
+  return normalizeTwitterRedirectUri(`${proto}://${host}/auth/twitter/callback`);
 }
 
 const TWITTER_AUTHORIZE_URL = "https://twitter.com/i/oauth2/authorize";
@@ -53,6 +79,7 @@ function isTwitterOAuthConfigured() {
 
 module.exports = {
   resolveTwitterOAuthRedirectUri,
+  normalizeTwitterRedirectUri,
   resolveTwitterOAuthScopes,
   TWITTER_AUTHORIZE_URL,
   TWITTER_TOKEN_URL,

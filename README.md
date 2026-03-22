@@ -42,6 +42,8 @@ npm start
 
 The app listens on `PORT` (default **80**; set `PORT=3000` for local dev if you cannot bind to 80). Open the dashboard at `/dashboard` after signing in with GitHub. For HTTPS OAuth callbacks in production, set **`PUBLIC_BASE_URL`** (e.g. `https://yourdomain.com`) or **`TWITTER_OAUTH_CALLBACK_URL`** to the full `https://.../auth/twitter/callback` URL.
 
+This process serves **HTTP only**. If you use **`https://dev-sync.com`** in the browser, you need TLS on port 443 (e.g. **mkcert + Caddy**). See **[docs/local-dev-https.md](docs/local-dev-https.md)** and **[Caddyfile.example](Caddyfile.example)**. Until then, use **`http://dev-sync.com`** (and matching `http://` OAuth callback URLs), or you will see `ERR_CONNECTION_REFUSED` on port 443.
+
 For local development you can use `npx prisma migrate dev` instead of `migrate deploy`.
 
 ## Environment variables
@@ -57,7 +59,7 @@ For local development you can use `npx prisma migrate dev` instead of `migrate d
 
 **`SESSION_SECRET`:** one secret for the entire server (Express signs all users’ cookies with it). It is **not** per developer. Set it in the process environment, secret manager, or via Initial Setup — not as one row per user in the database.
 
-**GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Optional: `GITHUB_OAUTH_CALLBACK_URL` (defaults to `{origin}/auth/github/callback`).
+**GitHub OAuth (optional “Login with GitHub”):** set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET` in the process environment or your host’s secret manager — they are intentionally omitted from `.example.env`. Callback URL resolution: optional **`GITHUB_OAUTH_CALLBACK_URL`** (must match the OAuth App’s **Authorization callback URL** in GitHub exactly); else **`PUBLIC_BASE_URL`** + `/auth/github/callback`; else `{protocol}://{host}/auth/github/callback` (set **`TRUST_PROXY=1`** and **`FORCE_HTTPS=1`** behind TLS termination). If GitHub shows *“The redirect_uri is not associated with this application”*, the registered callback and the URL your server sends differ — set `DEBUG_GITHUB_OAUTH=1`, click login once, and copy the logged `redirect_uri` into [GitHub → OAuth App → Authorization callback URL](https://github.com/settings/developers).
 
 Per-developer data is stored on `developers` (see Prisma model comments): `githubUsername` / `githubLogin`, optional BYO OAuth app fields (`githubOauthClientId`, `githubOauthClientSecretEnc`), and **portfolio deploy target URL** in **`deploy_repo_url`** (set in the dashboard as “Deploy repo URL”). After each sync, portfolio deploy runs automatically when a deploy repo URL is configured (see deploy script behavior). **GitHub API access for sync jobs** uses `GITHUB_TOKEN` in the **server** environment (not stored per developer). Optional server `DEPLOY_REPO_URL` can still override for a process when set; otherwise deploy reads `deploy_repo_url` from the database.
 
@@ -85,7 +87,9 @@ OAuth 2.0 with PKCE connects a developer’s **X account** for **user-context** 
 
 **HTTPS callback URLs:** Prefer **`PUBLIC_BASE_URL`** (e.g. `https://yourdomain.com`, no trailing slash) so the redirect URI is always `https://yourdomain.com/auth/twitter/callback`. Alternatively set **`TWITTER_OAUTH_CALLBACK_URL`** to that full URL. If you terminate TLS in front of Node, set **`TRUST_PROXY=1`** (or `true`) and **`FORCE_HTTPS=1`** so the app builds `https://...` when `PUBLIC_BASE_URL` is unset. Optional: **`TWITTER_OAUTH_SCOPES`** (defaults to `tweet.read tweet.write users.read offline.access`).
 
-Register the same callback URL in the X app settings. Posting requires your X project/access tier to allow **`tweet.write`** (check current X API pricing and rules).
+**Callback URL must match exactly.** In the [X Developer Portal](https://developer.x.com), open your app → **User authentication settings** → enable **OAuth 2.0** → under **Callback URI / Redirect URL**, add the **same** URL your server uses (same scheme `http` vs `https`, host, path, no extra trailing slash). It must match what [`resolveTwitterOAuthRedirectUri`](src/social/twitter/oauth/config.js) produces: `TWITTER_OAUTH_CALLBACK_URL`, or `PUBLIC_BASE_URL` + `/auth/twitter/callback`, or `req` host–derived URL. If you see *“The redirect_uri is not associated with this application”*, the portal list and `.env` differ. Set `DEBUG_TWITTER_OAUTH=1` and click **Connect X** once; the server logs the exact `redirect_uri` to paste into the portal.
+
+Posting requires your X project/access tier to allow **`tweet.write`** (check current X API pricing and rules).
 
 Background jobs use the same Redis queue as other social posts. Sample: `npm run sample-twitter-post` (requires a row in `developer_twitter_auth_data` after **Connect X** in the dashboard).
 

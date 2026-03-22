@@ -58,6 +58,66 @@ async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, callbackU
 }
 
 /**
+ * GitHub compares redirect_uri to the OAuth App’s “Authorization callback URL” (exact match).
+ * @param {string} u
+ * @returns {string}
+ */
+function normalizeGithubRedirectUri(u) {
+  const s = String(u ?? '').trim();
+  if (!s) return s;
+  try {
+    const parsed = new URL(s);
+    let path = parsed.pathname;
+    if (path.length > 1 && path.endsWith('/')) {
+      path = path.slice(0, -1);
+    }
+    parsed.pathname = path;
+    return parsed.toString();
+  } catch {
+    return s.replace(/\/+$/, '') || s;
+  }
+}
+
+/**
+ * Public browser scheme for OAuth callback when built from the request (behind Caddy/nginx, use forwarded proto).
+ * @param {import('express').Request} req
+ * @returns {'http' | 'https'}
+ */
+function resolvePublicProtoForOAuth(req) {
+  const forceHttps =
+    process.env.FORCE_HTTPS === '1' ||
+    process.env.FORCE_HTTPS === 'true' ||
+    String(process.env.USE_HTTPS_PUBLIC_URL ?? '').toLowerCase() === 'true';
+  if (forceHttps) return 'https';
+  const fp = String(req.get('x-forwarded-proto') ?? '')
+    .split(',')[0]
+    .trim()
+    .toLowerCase();
+  if (fp === 'https' || fp === 'http') return fp;
+  return req.protocol === 'https' ? 'https' : 'http';
+}
+
+/**
+ * Same precedence as Twitter/X: explicit env → PUBLIC_BASE_URL + path → request host.
+ * Prefer https when behind TLS termination (X-Forwarded-Proto) or FORCE_HTTPS.
+ * @param {import('express').Request} req
+ */
+function resolveGithubOAuthCallbackUrl(req) {
+  const envSnapshot = mergedEnv();
+  const explicit = String(envSnapshot.GITHUB_OAUTH_CALLBACK_URL ?? '').trim();
+  if (explicit) {
+    return normalizeGithubRedirectUri(explicit);
+  }
+  const pub = String(envSnapshot.PUBLIC_BASE_URL ?? '').trim().replace(/\/$/, '');
+  if (pub) {
+    return normalizeGithubRedirectUri(`${pub}/auth/github/callback`);
+  }
+  const proto = resolvePublicProtoForOAuth(req);
+  const host = req.get('host') || '';
+  return normalizeGithubRedirectUri(`${proto}://${host}/auth/github/callback`);
+}
+
+/**
  * GitHub OAuth authorize + token exchange: server env app, or optional BYO app on `developers`
  * (when `req.session.oauthDeveloperId` / `req.session.user.developerId` is set).
  *
@@ -66,10 +126,7 @@ async function findDeveloperOAuthCredentialsByEnvClientId(envClientId, callbackU
  */
 async function resolveGithubOAuthAppCredentials(req) {
   const envSnapshot = mergedEnv();
-  const defaultCallback = `${req.protocol}://${req.get('host')}/auth/github/callback`;
-  const envCallback =
-    (envSnapshot.GITHUB_OAUTH_CALLBACK_URL && String(envSnapshot.GITHUB_OAUTH_CALLBACK_URL).trim()) ||
-    defaultCallback;
+  const envCallback = resolveGithubOAuthCallbackUrl(req);
 
   const envClientId = String(envSnapshot.GITHUB_CLIENT_ID ?? '').trim();
   const envClientSecret = resolveGithubOAuthClientSecretFromEnv(envSnapshot);
@@ -147,6 +204,9 @@ async function isGithubOAuthConfigured(req) {
 
 module.exports = {
   resolveGithubOAuthAppCredentials,
+  resolveGithubOAuthCallbackUrl,
+  resolvePublicProtoForOAuth,
+  normalizeGithubRedirectUri,
   isGithubOAuthConfigured,
   resolveGithubOAuthClientSecretFromEnv,
 };

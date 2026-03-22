@@ -417,6 +417,12 @@ app.get('/auth/github', async (req, res) => {
     url.searchParams.set('redirect_uri', creds.callbackUrl);
     url.searchParams.set('scope', 'read:user user:email');
     url.searchParams.set('state', state);
+    if (process.env.DEBUG_GITHUB_OAUTH === '1' || process.env.DEBUG_GITHUB_OAUTH === 'true') {
+      console.log(
+        '[github-oauth] redirect_uri (must match GitHub OAuth App Authorization callback URL exactly):',
+        creds.callbackUrl,
+      );
+    }
     res.redirect(url.toString());
   } catch (err) {
     respondError(res, 500, 'OAuth start failed', err?.message ?? String(err));
