@@ -9,6 +9,7 @@ function sanitizeDeveloperForClient(dev) {
     githubPatEnc,
     linkedinAccessTokenEnc,
     developerFacebookAuthData,
+    developerTwitterAuthData,
     ...rest
   } = dev;
   let fbSanitized = null;
@@ -19,12 +20,21 @@ function sanitizeDeveloperForClient(dev) {
       facebookPageConnected: Boolean(pageAccessTokenEnc),
     };
   }
+  let twSanitized = null;
+  if (developerTwitterAuthData && typeof developerTwitterAuthData === "object") {
+    const { accessTokenEnc, refreshTokenEnc, ...twRest } = developerTwitterAuthData;
+    twSanitized = {
+      ...twRest,
+      twitterConnected: Boolean(accessTokenEnc),
+    };
+  }
   return {
     ...rest,
     githubOauthClientSecretConfigured: Boolean(githubOauthClientSecretEnc),
     githubPatConfigured: Boolean(githubPatEnc),
     linkedinAccessTokenConfigured: Boolean(linkedinAccessTokenEnc),
     developerFacebookAuthData: fbSanitized,
+    developerTwitterAuthData: twSanitized,
   };
 }
 

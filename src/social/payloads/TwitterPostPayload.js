@@ -1,6 +1,5 @@
 /**
- * Placeholder for X (Twitter) API v2 post body.
- * Wire credentials and `toApiBody()` when Twitter OAuth/tokens exist in the app.
+ * X API v2 `POST /2/tweets` JSON body.
  */
 class TwitterPostPayload {
   /**
@@ -8,12 +7,12 @@ class TwitterPostPayload {
    * @param {string} [opts.text]
    */
   constructor(opts = {}) {
-    this.text = opts.text == null ? '' : String(opts.text);
+    this.text = opts.text == null ? "" : String(opts.text);
   }
 
-  /** @returns {Record<string, unknown>} */
+  /** @returns {{ text: string }} */
   toApiBody() {
-    throw new Error('TwitterPostPayload: posting not implemented');
+    return { text: this.text };
   }
 }
 

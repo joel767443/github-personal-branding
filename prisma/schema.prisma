@@ -109,6 +109,7 @@ model Developer {
   developerPublications     DeveloperPublication[]
   socialIntegrations DeveloperSocialIntegration[]
   developerFacebookAuthData DeveloperFacebookAuthData?
+  developerTwitterAuthData DeveloperTwitterAuthData?
 
   @@map("developers")
 }
@@ -140,6 +141,22 @@ model DeveloperFacebookAuthData {
   developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
 
   @@map("developer_facebook_auth_data")
+}
+
+/// X (Twitter) OAuth 2.0 user context — `POST /2/tweets` with stored tokens.
+model DeveloperTwitterAuthData {
+  id        Int      @id @default(autoincrement())
+  developerId Int    @unique @map("developer_id")
+  twitterUserId String @map("twitter_user_id")
+  twitterUsername String? @map("twitter_username")
+  accessTokenEnc  String @map("access_token_enc") @db.Text
+  refreshTokenEnc String? @map("refresh_token_enc") @db.Text
+  accessTokenExpiresAt DateTime? @map("access_token_expires_at")
+  lastPostedAt DateTime? @map("last_posted_at")
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@map("developer_twitter_auth_data")
 }
 
 model Repo {

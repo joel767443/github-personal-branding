@@ -85,6 +85,8 @@ const syncFrequencySelect = document.getElementById("syncFrequencySelect");
 const saveSettingsBtn = document.getElementById("saveSettingsBtn");
 const facebookStatus = document.getElementById("facebookStatus");
 const facebookSharePersonalLink = document.getElementById("facebookSharePersonalLink");
+const twitterStatus = document.getElementById("twitterStatus");
+const btnTwitterDisconnect = document.getElementById("btnTwitterDisconnect");
 const socialTwitter = document.getElementById("socialTwitter");
 const socialLinkedin = document.getElementById("socialLinkedin");
 const btnCheckout = document.getElementById("btnCheckout");
@@ -471,10 +473,41 @@ function applyFacebookOAuthFlash() {
   }
 }
 
+function applyTwitterOAuthFlash() {
+  const u = new URL(window.location.href);
+  const ok = u.searchParams.get("twitter");
+  const err = u.searchParams.get("twitter_error");
+  if (ok === "connected" && settingsMsg) {
+    settingsMsg.textContent = "X (Twitter) connected. Background posts can use your account.";
+  } else if (ok === "login_required" && settingsMsg) {
+    settingsMsg.textContent = "Sign in first, then connect X (Twitter).";
+  } else if (err && settingsMsg) {
+    let decoded = err;
+    try {
+      decoded = decodeURIComponent(String(err).replace(/\+/g, " "));
+    } catch {
+      decoded = String(err);
+    }
+    if (String(decoded).toLowerCase().includes("config")) {
+      settingsMsg.textContent =
+        "X (Twitter): server missing TWITTER_CLIENT_ID / TWITTER_CLIENT_SECRET. Set them in the environment.";
+    } else {
+      settingsMsg.textContent = `X (Twitter): ${decoded}`;
+    }
+  }
+  if (ok || err) {
+    u.searchParams.delete("twitter");
+    u.searchParams.delete("twitter_error");
+    const q = u.searchParams.toString();
+    window.history.replaceState({}, "", q ? `${u.pathname}?${q}` : u.pathname);
+  }
+}
+
 async function loadSettingsForm() {
   if (!syncFrequencySelect) return;
   try {
     applyFacebookOAuthFlash();
+    applyTwitterOAuthFlash();
     const data = await getJsonOptional("/api/settings/developer");
     const d = data?.developer;
     if (!d) return;
@@ -492,6 +525,18 @@ async function loadSettingsForm() {
         facebookStatus.textContent = "Page connected — API posts use this Page";
       } else {
         facebookStatus.textContent = "No Page connected for API posting";
+      }
+    }
+    const tw = d.developerTwitterAuthData;
+    if (twitterStatus) {
+      if (tw?.twitterConnected && tw?.twitterUsername) {
+        twitterStatus.textContent = `Connected @${tw.twitterUsername} — API posts use this account`;
+      } else if (tw?.twitterConnected && tw?.twitterUserId) {
+        twitterStatus.textContent = `Connected (user ${tw.twitterUserId}) — API posts use this account`;
+      } else if (tw?.twitterConnected) {
+        twitterStatus.textContent = "Connected — API posts use this X account";
+      } else {
+        twitterStatus.textContent = "Not connected for API posting";
       }
     }
     const deployUrlField = document.getElementById("deployRepoUrlInput");
@@ -1417,6 +1462,24 @@ async function submitGithubPat() {
 }
 
 btnSaveGithubPat?.addEventListener("click", () => submitGithubPat());
+
+btnTwitterDisconnect?.addEventListener("click", async () => {
+  if (settingsMsg) settingsMsg.textContent = "Disconnecting X…";
+  try {
+    const r = await fetch("/auth/twitter/disconnect", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || r.statusText || "Disconnect failed");
+    if (settingsMsg) settingsMsg.textContent = "X (Twitter) disconnected.";
+    await loadSettingsForm();
+  } catch (e) {
+    if (settingsMsg) settingsMsg.textContent = e?.message ?? String(e);
+  }
+});
 
 facebookSharePersonalLink?.addEventListener("click", (e) => {
   e.preventDefault();

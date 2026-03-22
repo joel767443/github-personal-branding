@@ -10,6 +10,7 @@ const seedTechDetectorRules = require('./jobs/seedTechDetectorRules');
 const progressBus = require('./config/progressBus');
 const requireLogin = require('./middleware/requireLogin');
 const monitoringRoutes = require('./routes/monitoringRoutes');
+const twitterAuthRoutes = require('./routes/twitterAuthRoutes');
 const dataRoutes = require('./routes/dataRoutes');
 const viewsRoutes = require('./routes/viewsRoutes');
 const apiV1Routes = require('./routes/apiV1Routes');
@@ -100,6 +101,7 @@ if (process.env.TRUST_PROXY === '1' || process.env.TRUST_PROXY === 'true') {
 }
 app.use(express.static('src/web'));
 app.use(monitoringRoutes);
+app.use(twitterAuthRoutes);
 
 // Serve SPA shell for direct browser navigation to `/data/:page` while
 // preserving JSON API behavior for fetch/XHR calls on the same paths.
@@ -748,6 +750,7 @@ app.get('/api/settings/developer', requireLogin, async (req, res) => {
       include: {
         socialIntegrations: { orderBy: { platform: 'asc' } },
         developerFacebookAuthData: true,
+        developerTwitterAuthData: true,
       },
     });
     res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
@@ -824,7 +827,11 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     }
     const full = await prisma.developer.findUnique({
       where: { id: developer.id },
-      include: { socialIntegrations: true, developerFacebookAuthData: true },
+      include: {
+        socialIntegrations: true,
+        developerFacebookAuthData: true,
+        developerTwitterAuthData: true,
+      },
     });
     res.json({ ok: true, developer: sanitizeDeveloperForClient(full) });
   } catch (err) {

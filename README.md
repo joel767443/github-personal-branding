@@ -76,6 +76,14 @@ Automated posts use the **Graph API Page feed** only (`POST /{page-id}/feed`). Y
 
 For sharing to your **own** timeline without API posting, use the dashboard link that opens Facebook’s sharer (manual).
 
+### X (Twitter) (optional)
+
+OAuth 2.0 with PKCE connects a developer’s **X account** for **user-context** API calls. Set **`TWITTER_CLIENT_ID`** and **`TWITTER_CLIENT_SECRET`** from the X Developer Portal (OAuth 2.0 client). Optional: **`TWITTER_OAUTH_CALLBACK_URL`** (defaults to `{origin}/auth/twitter/callback`), **`TWITTER_OAUTH_SCOPES`** (defaults to `tweet.read tweet.write users.read offline.access`).
+
+Register the same callback URL in the X app settings. Posting requires your X project/access tier to allow **`tweet.write`** (check current X API pricing and rules).
+
+Background jobs use the same Redis queue as other social posts. Sample: `npm run sample-twitter-post` (requires a row in `developer_twitter_auth_data` after **Connect X** in the dashboard).
+
 ## npm scripts
 
 | Script | Command |
@@ -83,6 +91,7 @@ For sharing to your **own** timeline without API posting, use the dashboard link
 | `npm run deploy-portfolio` | Push generated `./portfolio` (uses `developers.deploy_repo_url` when `DEPLOY_REPO_URL` is unset) |
 | `npm run deploy-portfolio:regen` | Regenerate portfolio from DB, then deploy |
 | `npm run sample-facebook-post` | Enqueue a sample **Facebook Page** post (needs Redis + Page OAuth data) |
+| `npm run sample-twitter-post` | Enqueue a sample **X** tweet (needs Redis + Twitter OAuth data) |
 | `npm run push:origin` | `git push origin HEAD` (this app’s source repo) |
 
 ## Repository layout

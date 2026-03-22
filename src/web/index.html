@@ -98,6 +98,21 @@
               </div>
             </div>
           </div>
+          <div class="row settings-facebook-col">
+            <div class="settings-facebook-block">
+              <strong>X (Twitter)</strong>
+              <p class="muted">
+                Connect with OAuth 2.0. Background jobs can post tweets via the X API (access tier must allow
+                <code>tweet.write</code>).
+              </p>
+              <div class="row settings-facebook-row">
+                <span class="muted">$1/mo add-on when enabled (Stripe)</span>
+                <a href="/auth/twitter" id="twitterConnectLink">Connect X</a>
+                <button type="button" id="btnTwitterDisconnect">Disconnect X</button>
+                <span id="twitterStatus" class="muted" aria-live="polite"></span>
+              </div>
+            </div>
+          </div>
           <div class="row">
             <label><input type="checkbox" id="socialTwitter" /> Twitter</label>
             <label><input type="checkbox" id="socialLinkedin" /> LinkedIn</label>

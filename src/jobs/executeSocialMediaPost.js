@@ -10,8 +10,8 @@ const prisma = require('../db/prisma');
 const { decryptField } = require('../crypto/fieldEncryption');
 const { facebookGraphApiVersion } = require('../services/facebookOAuth');
 const { FacebookPostPayload } = require('../social/payloads/FacebookPostPayload');
-const { TwitterPostPayload } = require('../social/payloads/TwitterPostPayload');
 const { LinkedInPostPayload } = require('../social/payloads/LinkedInPostPayload');
+const { postTwitter } = require('./postTwitter');
 
 /**
  * @param {number} developerId
@@ -100,4 +100,5 @@ async function executeSocialMediaPost({ developerId, platform, payload }) {
 module.exports = {
   executeSocialMediaPost,
   postFacebook,
+  postTwitter,
 };
