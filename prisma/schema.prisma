@@ -107,6 +107,7 @@ model Developer {
   developerRecommendations   DeveloperRecommendation[]
   developerPublications     DeveloperPublication[]
   socialIntegrations DeveloperSocialIntegration[]
+  developerFacebookAuthData DeveloperFacebookAuthData?
 
   @@map("developers")
 }
@@ -124,6 +125,19 @@ model DeveloperSocialIntegration {
   @@unique([developerId, platform])
   @@index([developerId])
   @@map("developer_social_integrations")
+}
+
+/// Facebook Page posting: page id (or username), Page access token, optional last-post timestamp.
+model DeveloperFacebookAuthData {
+  id               Int       @id @default(autoincrement())
+  developerId      Int       @unique @map("developer_id")
+  facebookPageId   String    @map("facebook_page_id")
+  pageAccessToken  String    @map("page_access_token") @db.Text
+  lastPostedAt     DateTime? @map("last_posted_at")
+
+  developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
+
+  @@map("developer_facebook_auth_data")
 }
 
 model Repo {
