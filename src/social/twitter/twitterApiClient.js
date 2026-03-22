@@ -3,6 +3,28 @@
  */
 
 /**
+ * @param {Record<string, unknown>} json
+ * @param {string} fallback
+ */
+function twitterApiErrorMessage(json, fallback) {
+  const err0 = json?.errors?.[0];
+  const detail = err0?.detail != null ? String(err0.detail) : "";
+  const title = err0?.title != null ? String(err0.title) : "";
+  const message = err0?.message != null ? String(err0.message) : "";
+  let msg =
+    detail ||
+    message ||
+    title ||
+    (typeof json?.detail === "string" ? json.detail : "") ||
+    fallback;
+  if (typeof msg !== "string" || !msg) msg = fallback;
+  if (/credits?/i.test(msg)) {
+    msg += " Add usage credits or upgrade API access in the X Developer Portal (developer.x.com).";
+  }
+  return msg;
+}
+
+/**
  * @param {string} accessToken
  * @returns {Promise<{ id: string, username?: string, name?: string }>}
  */
@@ -14,7 +36,7 @@ async function fetchTwitterUser(accessToken) {
   });
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok || json.errors?.length) {
-    const msg = json.errors?.[0]?.detail || json.errors?.[0]?.message || resp.statusText || "users/me failed";
+    const msg = twitterApiErrorMessage(json, resp.statusText || "users/me failed");
     throw new Error(`Twitter API: ${msg}`);
   }
   const u = json.data;
@@ -44,7 +66,7 @@ async function createTweet(accessToken, { text }) {
   });
   const json = await resp.json().catch(() => ({}));
   if (!resp.ok || json.errors?.length) {
-    const msg = json.errors?.[0]?.detail || json.errors?.[0]?.message || json.detail || resp.statusText || "post failed";
+    const msg = twitterApiErrorMessage(json, resp.statusText || "post failed");
     throw new Error(`Twitter API: ${msg}`);
   }
   const id = json.data?.id;

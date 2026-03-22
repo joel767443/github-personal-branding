@@ -89,7 +89,7 @@ OAuth 2.0 with PKCE connects a developer’s **X account** for **user-context** 
 
 **Callback URL must match exactly.** In the [X Developer Portal](https://developer.x.com), open your app → **User authentication settings** → enable **OAuth 2.0** → under **Callback URI / Redirect URL**, add the **same** URL your server uses (same scheme `http` vs `https`, host, path, no extra trailing slash). It must match what [`resolveTwitterOAuthRedirectUri`](src/social/twitter/oauth/config.js) produces: `TWITTER_OAUTH_CALLBACK_URL`, or `PUBLIC_BASE_URL` + `/auth/twitter/callback`, or `req` host–derived URL. If you see *“The redirect_uri is not associated with this application”*, the portal list and `.env` differ. Set `DEBUG_TWITTER_OAUTH=1` and click **Connect X** once; the server logs the exact `redirect_uri` to paste into the portal.
 
-Posting requires your X project/access tier to allow **`tweet.write`** (check current X API pricing and rules).
+Posting requires your X project/access tier to allow **`tweet.write`** and **API usage credits** on your developer account. If the API returns *no credits to fulfill this request*, add credits or upgrade access in the [X Developer Portal](https://developer.x.com) (billing / product tier), then retry.
 
 Background jobs use the same Redis queue as other social posts. Sample: `npm run sample-twitter-post` (requires a row in `developer_twitter_auth_data` after **Connect X** in the dashboard).
 
