@@ -6,6 +6,10 @@
  *            REDIS_URL for enqueue, ENCRYPTION_MASTER_KEY if tokens are encrypted.
  * Token must include scope for posting (e.g. w_member_social per LinkedIn docs).
  *
+ * Post text: Gemini summarizes this repo’s recent GitHub activity (commits + PRs) unless
+ * SAMPLE_POST_USE_STATIC=1. Needs GEMINI_API_KEY, GITHUB_TOKEN (for private repos / rate limits),
+ * optional GITHUB_ACTIVITY_REPO=owner/repo and POST_ACTIVITY_DAYS (default 7).
+ *
  * Usage:
  *   node scripts/sampleLinkedInPost.js
  *   DEVELOPER_ID=2 node scripts/sampleLinkedInPost.js
@@ -14,16 +18,12 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
+const path = require('path');
 const prisma = require('../src/db/prisma');
 const { enqueueSocialMediaPost } = require('../src/social/enqueueSocialMediaPost');
 const { queuesEnabled } = require('../src/queue/jobQueues');
 const { executeSocialMediaPost } = require('../src/jobs/executeSocialMediaPost');
-
-const SAMPLE_TEXT = [
-  'GitHub Intel — sync your GitHub profile, portfolio, and LinkedIn data in one place.',
-  'Automate README deploys and keep your developer story up to date.',
-  'Built with github-intel-service.',
-].join(' ');
+const { generateSamplePostBody } = require('../src/services/samplePostGeminiContent');
 
 function hasLinkedinCredentials(row) {
   if (!row) return false;
@@ -95,7 +95,8 @@ async function resolveDeveloperId() {
 
 async function main() {
   const developerId = await resolveDeveloperId();
-  const payload = { text: SAMPLE_TEXT };
+  const text = await generateSamplePostBody('linkedin', { cwd: path.join(__dirname, '..') });
+  const payload = { text };
 
   if (process.env.SAMPLE_POST_DIRECT === '1' || process.env.SAMPLE_POST_DIRECT === 'true') {
     const result = await executeSocialMediaPost({

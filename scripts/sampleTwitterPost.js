@@ -5,6 +5,9 @@
  * Requires: DATABASE_URL, developer with `developer_twitter_auth_data` (after Connect X in dashboard),
  *            REDIS_URL for enqueue, ENCRYPTION_MASTER_KEY if tokens are encrypted.
  *
+ * Tweet text: Gemini + this repo’s GitHub activity unless SAMPLE_POST_USE_STATIC=1.
+ * See sampleLinkedInPost.js header for GEMINI_API_KEY / GITHUB_ACTIVITY_REPO / etc.
+ *
  * Usage:
  *   node scripts/sampleTwitterPost.js
  *   DEVELOPER_ID=2 node scripts/sampleTwitterPost.js
@@ -13,13 +16,12 @@
 
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 
+const path = require("path");
 const prisma = require("../src/db/prisma");
 const { enqueueSocialMediaPost } = require("../src/social/enqueueSocialMediaPost");
 const { queuesEnabled } = require("../src/queue/jobQueues");
 const { executeSocialMediaPost } = require("../src/jobs/executeSocialMediaPost");
-
-const SAMPLE_TEXT =
-  "GitHub Intel — sync your GitHub profile, portfolio, and LinkedIn data in one place. #buildinpublic";
+const { generateSamplePostBody } = require("../src/services/samplePostGeminiContent");
 
 function maskDbUrl() {
   const u = process.env.DATABASE_URL;
@@ -69,7 +71,8 @@ async function resolveDeveloperId() {
 
 async function main() {
   const developerId = await resolveDeveloperId();
-  const payload = { text: SAMPLE_TEXT };
+  const text = await generateSamplePostBody("twitter", { cwd: path.join(__dirname, "..") });
+  const payload = { text };
 
   if (process.env.SAMPLE_POST_DIRECT === "1" || process.env.SAMPLE_POST_DIRECT === "true") {
     const result = await executeSocialMediaPost({

@@ -11,6 +11,7 @@
     "sample-twitter-post": "node scripts/sampleTwitterPost.js",
     "sample-linkedin-post": "node scripts/sampleLinkedInPost.js",
     "ask-gemini": "node scripts/askGemini.js",
+    "dev-recap-gemini": "node scripts/devRecapGemini.js",
     "push:origin": "git push origin HEAD"
   },
   "keywords": [],

@@ -6,6 +6,9 @@
  * Requires: DATABASE_URL, developer with `developer_facebook_auth_data`, REDIS_URL for enqueue,
  *            ENCRYPTION_MASTER_KEY if tokens are encrypted.
  *
+ * Post body: Gemini + this repo’s GitHub activity unless SAMPLE_POST_USE_STATIC=1.
+ * See sampleLinkedInPost.js header for GEMINI_API_KEY / GITHUB_ACTIVITY_REPO / etc.
+ *
  * Usage:
  *   node scripts/sampleFacebookPost.js
  *   DEVELOPER_ID=2 node scripts/sampleFacebookPost.js
@@ -14,16 +17,12 @@
 
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 
+const path = require('path');
 const prisma = require('../src/db/prisma');
 const { enqueueSocialMediaPost } = require('../src/social/enqueueSocialMediaPost');
 const { queuesEnabled } = require('../src/queue/jobQueues');
 const { executeSocialMediaPost } = require('../src/jobs/executeSocialMediaPost');
-
-const SAMPLE_MESSAGE = [
-  'GitHub Intel — sync your GitHub profile, portfolio, and LinkedIn data in one place.',
-  'Automate README deploys and keep your developer story up to date.',
-  'Built with github-intel-service.',
-].join(' ');
+const { generateSamplePostBody } = require('../src/services/samplePostGeminiContent');
 
 function maskDbUrl() {
   const u = process.env.DATABASE_URL;
@@ -77,7 +76,8 @@ async function resolveDeveloperId() {
 
 async function main() {
   const developerId = await resolveDeveloperId();
-  const payload = { message: SAMPLE_MESSAGE };
+  const message = await generateSamplePostBody('facebook', { cwd: path.join(__dirname, '..') });
+  const payload = { message };
 
   if (process.env.SAMPLE_POST_DIRECT === '1' || process.env.SAMPLE_POST_DIRECT === 'true') {
     const result = await executeSocialMediaPost({

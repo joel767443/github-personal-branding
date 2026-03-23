@@ -173,6 +173,81 @@ async function getRepository(github, owner, repo) {
 }
 
 /**
+ * README body as plain text (Markdown). Returns null if missing or inaccessible.
+ *
+ * @param {import('axios').AxiosInstance} github
+ */
+async function getRepoReadmePlaintext(github, owner, repo) {
+  try {
+    const res = await github.get(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/readme`, {
+      headers: { Accept: 'application/vnd.github.raw' },
+      responseType: 'text',
+      transformResponse: [(data) => data],
+    });
+    const t = typeof res.data === 'string' ? res.data : String(res.data ?? '');
+    return t.trim() || null;
+  } catch (err) {
+    const status = err?.response?.status;
+    if (status === 404) return null;
+    throw err;
+  }
+}
+
+/** @param {Date} d */
+function formatGithubSearchDayUtc(d) {
+  const x = new Date(d.getTime());
+  const y = x.getUTCFullYear();
+  const m = String(x.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(x.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+/**
+ * Pull requests where the user is the author and `updated` falls in [start, end] (UTC dates in query).
+ *
+ * @param {import('axios').AxiosInstance} github
+ * @param {string} login GitHub login
+ * @param {Date} start
+ * @param {Date} end
+ * @param {{ maxResults?: number }} [opts]
+ * @returns {Promise<Array<{ title: string, html_url: string, state: string, repository_url?: string }>>}
+ */
+async function searchUserPullRequestsInRange(github, login, start, end, opts = {}) {
+  const maxResults = Math.min(Number(opts.maxResults ?? 80) || 80, 1000);
+  const a = formatGithubSearchDayUtc(start);
+  const b = formatGithubSearchDayUtc(end);
+  const q = `is:pr author:${login} updated:${a}..${b}`;
+  const out = [];
+  let page = 1;
+  const perPage = 100;
+  while (out.length < maxResults) {
+    const res = await github.get('/search/issues', {
+      params: {
+        q,
+        per_page: perPage,
+        page,
+        sort: 'updated',
+        order: 'desc',
+      },
+    });
+    const items = Array.isArray(res.data?.items) ? res.data.items : [];
+    for (const it of items) {
+      out.push({
+        title: String(it?.title ?? ''),
+        html_url: String(it?.html_url ?? ''),
+        state: String(it?.state ?? ''),
+        repository_url: it?.repository_url != null ? String(it.repository_url) : undefined,
+      });
+      if (out.length >= maxResults) break;
+    }
+    if (items.length < perPage) break;
+    page += 1;
+    if (page > 10) break;
+  }
+  return out;
+}
+
+/**
  * Loads blob paths from the git tree. Tries `preferredBranch`, then main/master, then GitHub `default_branch`.
  *
  * @param {import('axios').AxiosInstance} github
@@ -234,5 +309,7 @@ module.exports = {
   getRepoTopics,
   getRepoGitTreeFiles,
   getRepository,
+  getRepoReadmePlaintext,
+  searchUserPullRequestsInRange,
   getRepoGitTreeFilesWithBranchFallback,
 };
