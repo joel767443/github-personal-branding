@@ -164,6 +164,65 @@ async function getRepoGitTreeFiles(github, owner, repo, branch = 'main') {
   }
 }
 
+/**
+ * @param {import('axios').AxiosInstance} github
+ */
+async function getRepository(github, owner, repo) {
+  const res = await github.get(`/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`);
+  return res.data;
+}
+
+/**
+ * Loads blob paths from the git tree. Tries `preferredBranch`, then main/master, then GitHub `default_branch`.
+ *
+ * @param {import('axios').AxiosInstance} github
+ * @param {string} [preferredBranch] job option (default `main`)
+ */
+async function getRepoGitTreeFilesWithBranchFallback(github, owner, repo, preferredBranch = 'main') {
+  const seen = new Set();
+  /** @type {string[]} */
+  const branchOrder = [];
+  const push = (b) => {
+    if (b == null || String(b).trim() === '') return;
+    const s = String(b).trim();
+    if (seen.has(s)) return;
+    seen.add(s);
+    branchOrder.push(s);
+  };
+
+  push(preferredBranch);
+  push('main');
+  push('master');
+
+  const tryBranch = async (b) => {
+    try {
+      return await getRepoGitTreeFiles(github, owner, repo, b);
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 404) return null;
+      throw err;
+    }
+  };
+
+  for (const b of branchOrder) {
+    const files = await tryBranch(b);
+    if (files !== null) return files;
+  }
+
+  try {
+    const meta = await getRepository(github, owner, repo);
+    const def = meta?.default_branch;
+    if (def && !seen.has(String(def))) {
+      const files = await tryBranch(String(def));
+      if (files !== null) return files;
+    }
+  } catch {
+    // ignore
+  }
+
+  return [];
+}
+
 module.exports = {
   createGithubClient,
   getEnvGithubClient,
@@ -174,4 +233,6 @@ module.exports = {
   getRepoContents,
   getRepoTopics,
   getRepoGitTreeFiles,
+  getRepository,
+  getRepoGitTreeFilesWithBranchFallback,
 };

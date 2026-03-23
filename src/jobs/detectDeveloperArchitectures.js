@@ -1,5 +1,10 @@
 const prisma = require("../db/prisma");
-const { createGithubClient, getEnvGithubClient, getRepoTopics, getRepoGitTreeFiles } = require("../services/githubService");
+const {
+  createGithubClient,
+  getEnvGithubClient,
+  getRepoTopics,
+  getRepoGitTreeFilesWithBranchFallback,
+} = require("../services/githubService");
 const { getGithubCredentialsForDeveloper } = require("../services/developerCredentials");
 
 function sleep(ms) {
@@ -114,13 +119,6 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress, devel
     },
   });
 
-  if (developerId != null) {
-    await prisma.developerArchitecture.deleteMany({ where: { developerId } });
-  } else {
-    await prisma.developerArchitecture.deleteMany();
-    await prisma.architecture.deleteMany();
-  }
-
   const devArchitectures = new Map();
   let skipped = 0;
   progress("Detecting architectures", {
@@ -154,17 +152,9 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress, devel
 
     let files = [];
     try {
-      files = await getRepoGitTreeFiles(github, owner, repoName, branch);
+      files = await getRepoGitTreeFilesWithBranchFallback(github, owner, repoName, branch);
     } catch {
-      if (branch === "main") {
-        try {
-          files = await getRepoGitTreeFiles(github, owner, repoName, "master");
-        } catch {
-          files = [];
-        }
-      } else {
-        files = [];
-      }
+      files = [];
     }
 
     const text = [
@@ -207,9 +197,20 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress, devel
       });
     }
   }
+  console.log("devArchitectureRows", devArchitectureRows);
+  // Replace after scan: failed runs keep prior rows; FK parents exist before insert.
+  if (developerId != null) {
+    await prisma.developerArchitecture.deleteMany({ where: { developerId } });
+  } else {
+    await prisma.developerArchitecture.deleteMany();
+    await prisma.architecture.deleteMany();
+  }
   if (devArchitectureRows.length > 0) {
     await ensureArchitectureRowsForKeywords();
-    await prisma.developerArchitecture.createMany({ data: devArchitectureRows });
+    await prisma.developerArchitecture.createMany({
+      data: devArchitectureRows,
+      skipDuplicates: true,
+    });
   }
 
   await rebuildArchitectureCatalogFromDeveloperLinks();
