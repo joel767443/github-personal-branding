@@ -79,15 +79,27 @@ async function rebuildArchitectureCatalogFromDeveloperLinks() {
     _sum: { count: true },
   });
   await prisma.$transaction(async (tx) => {
-    await tx.architecture.deleteMany();
-    if (grouped.length > 0) {
-      await tx.architecture.createMany({
-        data: grouped.map((g) => ({
+    const names = grouped.map((g) => g.name);
+
+    // Do not truncate `architectures`: `DeveloperArchitecture.name` FK uses onDelete: Cascade.
+    // Truncating parents would wipe child rows we just inserted.
+    for (const g of grouped) {
+      await tx.architecture.upsert({
+        where: { name: g.name },
+        create: {
           name: g.name,
           count: g._sum.count ?? 0,
-        })),
+        },
+        update: {
+          count: g._sum.count ?? 0,
+        },
       });
     }
+
+    // Remove catalog rows that are no longer referenced.
+    await tx.architecture.deleteMany({
+      where: names.length > 0 ? { name: { notIn: names } } : undefined,
+    });
   });
 }
 
