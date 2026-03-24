@@ -1,176 +1,271 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDBS setup</title>
-    <link rel="stylesheet" href="/styles/pdbs.css" />
-  </head>
-  <body>
-    <div class="page-container">
-      <div id="shellSidebar"></div>
 
-      <div class="right_col">
-        <div class="container">
-      <div id="shellTopNav"></div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDBS setup</title>
+  <link rel="stylesheet" href="/styles/pdbs.css" />
+</head>
 
-      <div class="card hidden tokenRequiredCard" id="githubTokenRequiredCard">
-        <h2>GitHub token required</h2>
-        <p class="muted">
-          No GitHub token is saved yet. Sync is blocked until you add one.
-          <a href="/github-token">Open GitHub token setup</a>.
-        </p>
-      </div>
+<body>
+  <div class="page-container">
+    <div id="shellSidebar"></div>
 
-      <div class="hidden" id="dashboardCard">
-        <div class="tileRow">
-          <div class="tileCount"><div class="tileTitle">Repos</div><div class="tileValue" id="statRepos"></div><div class="tileDelta">Owned repos processed</div></div>
-          <div class="tileCount"><div class="tileTitle">Commits</div><div class="tileValue" id="statCommits"></div><div class="tileDelta">Across your repos</div></div>
-          <div class="tileCount"><div class="tileTitle">Skills (LinkedIn)</div><div class="tileValue" id="statSkills"></div><div class="tileDelta">Profile skills</div></div>
-          <div class="tileCount"><div class="tileTitle">Endorsements</div><div class="tileValue" id="statEndorsements"></div><div class="tileDelta">Received</div></div>
-        </div>
-        <div class="tileRow">
-          <div class="tileCount"><div class="tileTitle">Recommendations</div><div class="tileValue" id="statRecommendations"></div><div class="tileDelta">LinkedIn</div></div>
-          <div class="tileCount"><div class="tileTitle">Experience</div><div class="tileValue" id="statExperiences"></div><div class="tileDelta">Roles</div></div>
-          <div class="tileCount"><div class="tileTitle">Publications</div><div class="tileValue" id="statPublications"></div><div class="tileDelta">Articles &amp; posts</div></div>
-          <div class="tileCount"><div class="tileTitle">Social posts (30d)</div><div class="tileValue" id="statSocialPosts30d"></div><div class="tileDelta">Completed post jobs</div></div>
-          <div class="tileCount"><div class="tileTitle">Failures (24h)</div><div class="tileValue" id="statFailures24h"></div><div class="tileDelta">Pipeline failures</div></div>
-        </div>
-        <div class="tileRow">
-          <div class="tileCount"><div class="tileTitle">Architecture catalog</div><div class="tileValue" id="statArchitectures"></div><div class="tileDelta">Global categories</div></div>
-          <div class="tileCount"><div class="tileTitle">Your tech stacks</div><div class="tileValue" id="statDeveloperTechStacks"></div><div class="tileDelta">Detected rules</div></div>
-          <div class="tileCount"><div class="tileTitle">Your arch patterns</div><div class="tileValue" id="statDeveloperArchitectures"></div><div class="tileDelta">Repo patterns</div></div>
-          <div class="tileCount"><div class="tileTitle">Monitoring</div><div class="tileValue" id="statRunningJobs"></div><div class="tileDelta" id="statLastJobStatus">Sync / LinkedIn / social status</div></div>
-        </div>
-        <div class="dashboardCharts" id="dashboardCharts">
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Monitoring — runs &amp; failures (30 days)</div>
-            <div class="chartCanvasWrap"><canvas id="chartMonitoringLine" aria-label="Runs and failures by day"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Sync status</div>
-            <div class="chartCanvasWrap chartCanvasWrapShort chartCanvasWrapJobStatus"><canvas id="chartJobStatus" aria-label="Job status distribution"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Job types</div>
-            <div class="chartCanvasWrap chartCanvasWrapShort chartCanvasWrapJobType"><canvas id="chartJobType" aria-label="Job type distribution"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Endorsements by skill</div>
-            <div class="chartCanvasWrap"><canvas id="chartEndorsements" aria-label="Endorsements by skill"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Developer tech stack (%)</div>
-            <div class="chartCanvasWrap"><canvas id="chartTechStack" aria-label="Tech stack percentages"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Architecture patterns (repos)</div>
-            <div class="chartCanvasWrap"><canvas id="chartArchitecture" aria-label="Architecture pattern counts"></canvas></div>
-          </div>
-          <div class="chartPanel">
-            <div class="chartPanelTitle">Experience</div>
-            <div class="chartCanvasWrap"><canvas id="chartExperience" aria-label="Experience roles"></canvas></div>
+    <div class="right_col">
+      <div class="container">
+        <div id="shellTopNav"></div>
+
+        <div class="tokenPageWrap">
+          <div class="tokenPageCard card">
+            <h1>GitHub token setup</h1>
+            <p class="muted">
+              Save your GitHub Personal Access Token and your profile repository URL so sync can run with your own
+              credentials.
+            </p>
+
+            <div class="tokenInstructions">
+              <h2>How to get your GitHub personal access token</h2>
+              <ol>
+                <li>Open GitHub and go to Settings -> Developer settings -> Personal access tokens -> Fine-grained
+                  tokens.</li>
+                <li>Create a new token with at least read access to repositories you want to sync.</li>
+                <li>Copy the token now, then paste it below. GitHub only shows the full token once.</li>
+              </ol>
+              <h2>How to get your profile repository URL</h2>
+              <ol>
+                <li>Open the repository that represents your profile/deployment source on GitHub.</li>
+                <li>Click <strong>Code</strong> and copy the HTTPS clone URL.</li>
+                <li>Use the full URL format like <code>https://github.com/username/repo.git</code>.</li>
+              </ol>
+            </div>
+
+            <div class="row auth-field">
+              <label for="githubPatInput">GitHub personal access token</label>
+              <input id="githubPatInput" type="password" autocomplete="off" placeholder="Paste token to save" />
+            </div>
+            <div class="row auth-field">
+              <label for="deployRepoUrlInput">GitHub profile repository URL</label>
+              <input id="deployRepoUrlInput" type="text" inputmode="url" autocomplete="off"
+                placeholder="https://github.com/username/repo.git" />
+            </div>
+            <div class="row">
+              <button type="button" id="btnSaveGithubPat">Save GitHub token</button>
+            </div>
+            <div id="githubPatMsg" class="muted" aria-live="polite"></div>
           </div>
         </div>
-      </div>
 
-      <div id="settingsCardMountDefault">
-        <div class="card hidden" id="settingsCard">
-          <h2>Account and billing</h2>
-          <p class="muted">Choose sync frequency (minimum every 2 days). Base plan and social add-ons are billed in Stripe.</p>
-          <div class="row settingsSyncRow">
-            <label for="syncFrequencySelect">Sync frequency</label>
-            <div class="settingsSyncControls">
-              <select id="syncFrequencySelect" name="syncFrequency">
-                <option value="TWO_DAYS">Every 2 days</option>
-                <option value="ONE_WEEK">Every week</option>
-                <option value="TWO_WEEKS">Every 2 weeks</option>
-                <option value="ONE_MONTH">Every month</option>
-              </select>
-              <button type="button" id="saveSettingsBtn">Save</button>
+        <div class="hidden" id="dashboardCard">
+          <div class="tileRow">
+            <div class="tileCount">
+              <div class="tileTitle">Repos</div>
+              <div class="tileValue" id="statRepos"></div>
+              <div class="tileDelta">Owned repos processed</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Commits</div>
+              <div class="tileValue" id="statCommits"></div>
+              <div class="tileDelta">Across your repos</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Skills (LinkedIn)</div>
+              <div class="tileValue" id="statSkills"></div>
+              <div class="tileDelta">Profile skills</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Endorsements</div>
+              <div class="tileValue" id="statEndorsements"></div>
+              <div class="tileDelta">Received</div>
             </div>
           </div>
-          <div class="row">
-            <span class="muted">Social integrations ($1/mo each when enabled)</span>
+          <div class="tileRow">
+            <div class="tileCount">
+              <div class="tileTitle">Recommendations</div>
+              <div class="tileValue" id="statRecommendations"></div>
+              <div class="tileDelta">LinkedIn</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Experience</div>
+              <div class="tileValue" id="statExperiences"></div>
+              <div class="tileDelta">Roles</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Publications</div>
+              <div class="tileValue" id="statPublications"></div>
+              <div class="tileDelta">Articles &amp; posts</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Social posts (30d)</div>
+              <div class="tileValue" id="statSocialPosts30d"></div>
+              <div class="tileDelta">Completed post jobs</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Failures (24h)</div>
+              <div class="tileValue" id="statFailures24h"></div>
+              <div class="tileDelta">Pipeline failures</div>
+            </div>
           </div>
-          <div class="row settings-facebook-col">
-            <div class="settings-facebook-block">
-              <strong>Facebook Page (automated posts)</strong>
-              <p class="muted">
-                Background posts use Meta’s API and go to a <strong>Facebook Page</strong> you manage (not a personal
-                profile timeline—Meta does not allow server-side posting to profiles).
-              </p>
-              <div class="row settings-facebook-row">
-                <span class="muted">$1/mo add-on when connected (Stripe)</span>
-                <a href="/auth/facebook" id="facebookConnectLink">Connect Facebook Page</a>
-                <span id="facebookStatus" class="muted" aria-live="polite"></span>
+          <div class="tileRow">
+            <div class="tileCount">
+              <div class="tileTitle">Architecture catalog</div>
+              <div class="tileValue" id="statArchitectures"></div>
+              <div class="tileDelta">Global categories</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Your tech stacks</div>
+              <div class="tileValue" id="statDeveloperTechStacks"></div>
+              <div class="tileDelta">Detected rules</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Your arch patterns</div>
+              <div class="tileValue" id="statDeveloperArchitectures"></div>
+              <div class="tileDelta">Repo patterns</div>
+            </div>
+            <div class="tileCount">
+              <div class="tileTitle">Monitoring</div>
+              <div class="tileValue" id="statRunningJobs"></div>
+              <div class="tileDelta" id="statLastJobStatus">Sync / LinkedIn / social status</div>
+            </div>
+          </div>
+          <div class="dashboardCharts" id="dashboardCharts">
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Monitoring — runs &amp; failures (30 days)</div>
+              <div class="chartCanvasWrap"><canvas id="chartMonitoringLine"
+                  aria-label="Runs and failures by day"></canvas></div>
+            </div>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Sync status</div>
+              <div class="chartCanvasWrap chartCanvasWrapShort chartCanvasWrapJobStatus"><canvas id="chartJobStatus"
+                  aria-label="Job status distribution"></canvas></div>
+            </div>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Job types</div>
+              <div class="chartCanvasWrap chartCanvasWrapShort chartCanvasWrapJobType"><canvas id="chartJobType"
+                  aria-label="Job type distribution"></canvas></div>
+            </div>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Endorsements by skill</div>
+              <div class="chartCanvasWrap"><canvas id="chartEndorsements" aria-label="Endorsements by skill"></canvas>
               </div>
             </div>
-          </div>
-          <div class="row settings-facebook-col">
-            <div class="settings-facebook-block">
-              <strong>X (Twitter)</strong>
-              <p class="muted">
-                Connect with OAuth 2.0. Background jobs can post tweets via the X API (access tier must allow
-                <code>tweet.write</code>).
-              </p>
-              <div class="row settings-facebook-row">
-                <span class="muted">$1/mo add-on when enabled (Stripe)</span>
-                <a href="/auth/twitter" id="twitterConnectLink">Connect X</a>
-                <button type="button" id="btnTwitterDisconnect">Disconnect X</button>
-                <span id="twitterStatus" class="muted" aria-live="polite"></span>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Developer tech stack (%)</div>
+              <div class="chartCanvasWrap"><canvas id="chartTechStack" aria-label="Tech stack percentages"></canvas>
               </div>
             </div>
-          </div>
-        
-          <div class="row">
-            <button type="button" id="btnCheckout">Open Stripe checkout</button>
-            <button type="button" id="btnPortal">Billing portal</button>
-          </div>
-          <div id="settingsMsg" class="muted"></div>
-        </div>
-      </div>
-
-      <div class="card hidden" id="dataPageCard">
-        <div id="dataPageSubtitle" class="muted"></div>
-        <div id="syncCardMountProfile"></div>
-        <div id="dataPageContent" class="row"></div>
-        <div id="settingsCardMountProfile"></div>
-      </div>
-
-      <div class="card hidden" id="loginCard">
-        <div id="serverConfigHint" class="auth-hint muted hidden"></div>
-        <div id="loginPanel">
-          <h2>Sign in</h2>
-          <p class="muted auth-intro">
-            Continue with GitHub to create an account or sign in. Save a GitHub personal access token under Account settings
-            for repository sync (encrypted), or use a shared server <code>GITHUB_TOKEN</code>.
-          </p>
-          <div class="row">
-            <button type="button" id="githubLoginBtn" class="btn-github">Continue with GitHub</button>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Architecture patterns (repos)</div>
+              <div class="chartCanvasWrap"><canvas id="chartArchitecture"
+                  aria-label="Architecture pattern counts"></canvas></div>
+            </div>
+            <div class="chartPanel">
+              <div class="chartPanelTitle">Experience</div>
+              <div class="chartCanvasWrap"><canvas id="chartExperience" aria-label="Experience roles"></canvas></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div id="syncCardMountPostSetup">
-        <div class="card hidden" id="syncCard">
-          <h2>Sync GitHub Data</h2>
-          <div class="row">
-            <button id="startSyncBtn">Start Sync</button>
-            <span id="syncState" class="muted">Idle</span>
+        <div id="settingsCardMountDefault">
+          <div class="card hidden" id="settingsCard">
+            <h2>Account and billing</h2>
+            <p class="muted">Choose sync frequency (minimum every 2 days). Base plan and social add-ons are billed in
+              Stripe.</p>
+            <div class="row settingsSyncRow">
+              <label for="syncFrequencySelect">Sync frequency</label>
+              <div class="settingsSyncControls">
+                <select id="syncFrequencySelect" name="syncFrequency">
+                  <option value="TWO_DAYS">Every 2 days</option>
+                  <option value="ONE_WEEK">Every week</option>
+                  <option value="TWO_WEEKS">Every 2 weeks</option>
+                  <option value="ONE_MONTH">Every month</option>
+                </select>
+                <button type="button" id="saveSettingsBtn">Save</button>
+              </div>
+            </div>
+            <div class="row">
+              <span class="muted">Social integrations ($1/mo each when enabled)</span>
+            </div>
+            <div class="row settings-facebook-col">
+              <div class="settings-facebook-block">
+                <strong>Facebook Page (automated posts)</strong>
+                <p class="muted">
+                  Background posts use Meta’s API and go to a <strong>Facebook Page</strong> you manage (not a personal
+                  profile timeline—Meta does not allow server-side posting to profiles).
+                </p>
+                <div class="row settings-facebook-row">
+                  <span class="muted">$1/mo add-on when connected (Stripe)</span>
+                  <a href="/auth/facebook" id="facebookConnectLink">Connect Facebook Page</a>
+                  <span id="facebookStatus" class="muted" aria-live="polite"></span>
+                </div>
+              </div>
+            </div>
+            <div class="row settings-facebook-col">
+              <div class="settings-facebook-block">
+                <strong>X (Twitter)</strong>
+                <p class="muted">
+                  Connect with OAuth 2.0. Background jobs can post tweets via the X API (access tier must allow
+                  <code>tweet.write</code>).
+                </p>
+                <div class="row settings-facebook-row">
+                  <span class="muted">$1/mo add-on when enabled (Stripe)</span>
+                  <a href="/auth/twitter" id="twitterConnectLink">Connect X</a>
+                  <button type="button" id="btnTwitterDisconnect">Disconnect X</button>
+                  <span id="twitterStatus" class="muted" aria-live="polite"></span>
+                </div>
+              </div>
+            </div>
+
+            <div class="row">
+              <button type="button" id="btnCheckout">Open Stripe checkout</button>
+              <button type="button" id="btnPortal">Billing portal</button>
+            </div>
+            <div id="settingsMsg" class="muted"></div>
           </div>
-          <div class="log" id="progressLog"></div>
         </div>
-      </div>
+
+        <div class="card hidden" id="dataPageCard">
+          <div id="dataPageSubtitle" class="muted"></div>
+          <div id="syncCardMountProfile"></div>
+          <div id="dataPageContent" class="row"></div>
+          <div id="settingsCardMountProfile"></div>
+        </div>
+
+        <div class="card hidden" id="loginCard">
+          <div id="serverConfigHint" class="auth-hint muted hidden"></div>
+          <div id="loginPanel">
+            <h2>Sign in</h2>
+            <p class="muted auth-intro">
+              Continue with GitHub to create an account or sign in. Save a GitHub personal access token under Account
+              settings
+              for repository sync (encrypted), or use a shared server <code>GITHUB_TOKEN</code>.
+            </p>
+            <div class="row">
+              <button type="button" id="githubLoginBtn" class="btn-github">Continue with GitHub</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="syncCardMountPostSetup">
+          <div class="card hidden" id="syncCard">
+            <h2>Sync GitHub Data</h2>
+            <div class="row">
+              <button id="startSyncBtn">Start Sync</button>
+              <span id="syncState" class="muted">Idle</span>
+            </div>
+            <div class="log" id="progressLog"></div>
+          </div>
+        </div>
 
         <footer class="pdbsFooter">Personal Developer Branding System</footer>
-        </div>
       </div>
     </div>
+  </div>
 
-    <script src="/shell.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="/app.js"></script>
-  </body>
-  </html>
+  <script src="/shell.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="/app.js"></script>
+  <script src="/github-token.js"></script>
+</body>
 
+</html>
