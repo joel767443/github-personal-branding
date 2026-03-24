@@ -1530,11 +1530,10 @@ table.monitoringRunsTable {
 }
 
 .tokenPageWrap {
-  min-height: 100vh;
+  min-height:80vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
   box-sizing: border-box;
 }
 

@@ -77,6 +77,7 @@ const startSyncBtn = document.getElementById("startSyncBtn");
 const pageTitle = document.getElementById("pageTitle");
 const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
+const githubTokenGateRoot = document.getElementById("githubTokenGateRoot");
 const githubTokenRequiredCard = document.getElementById("githubTokenRequiredCard");
 const dashboardCard = document.getElementById("dashboardCard");
 const settingsCard = document.getElementById("settingsCard");
@@ -1082,6 +1083,7 @@ async function refreshStatus() {
       Boolean(status.needsDeveloperCredentials) &&
       Boolean(route) &&
       (route.kind === "dashboard" || route.kind === "data");
+    const showTokenGateExclusive = showTokenRequiredCard;
 
     // Dashboard is only `/dashboard`, never on `/`, setup, login, or other routes.
     const showDashboard =
@@ -1091,16 +1093,17 @@ async function refreshStatus() {
     const hideShell = showSetup || showLogin || postSetupAwaitingAuth;
     setHidden(sidebarEl, hideShell);
     setHidden(topNavEl, hideShell);
+    setHidden(githubTokenGateRoot, !showTokenGateExclusive || hideShell);
     setHidden(githubTokenRequiredCard, !showTokenRequiredCard || hideShell);
 
     const showDataPageCard =
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
-    setHidden(dataPageCard, !showDataPageCard);
+    setHidden(dataPageCard, !showDataPageCard || showTokenGateExclusive);
 
     const showDashboardCard = showDashboard && !postSetupAwaitingAuth;
-    setHidden(dashboardCard, !showDashboardCard);
-    const showSettingsCard = showDataPageCard && isProfilePage;
-    setHidden(settingsCard, !showSettingsCard);
+    setHidden(dashboardCard, !showDashboardCard || showTokenGateExclusive);
+    const showSettingsCard = showDataPageCard && isProfilePage && !showTokenGateExclusive;
+    setHidden(settingsCard, !showSettingsCard || showTokenGateExclusive);
     if (settingsCard && settingsCardMountDefault && settingsCardMountProfile) {
       if (showSettingsCard) {
         settingsCardMountProfile.appendChild(settingsCard);
@@ -1122,7 +1125,7 @@ async function refreshStatus() {
     );
 
     const showAuthCard = (showSetup || showLogin) && !postSetupAwaitingAuth;
-    setHidden(loginCard, !showAuthCard);
+    setHidden(loginCard, !showAuthCard || showTokenGateExclusive);
     if (serverConfigHint) {
       if (showSetup && (status.missing?.length ?? 0) > 0) {
         serverConfigHint.textContent = `Server configuration incomplete: ${status.missing.join(", ")}. Set these in your environment or .env file (for example DATABASE_URL and SESSION_SECRET).`;
@@ -1133,7 +1136,7 @@ async function refreshStatus() {
     }
     // Sync GitHub: on `/profile` during normal flow; on post-setup mount when shell is minimal (before GitHub sign-in).
     const showSyncCard =
-      postSetupAwaitingAuth || (showSync && !forceUploadUi && isProfilePage);
+      !showTokenGateExclusive && (postSetupAwaitingAuth || (showSync && !forceUploadUi && isProfilePage));
     setHidden(syncCard, !showSyncCard);
     if (syncCard && syncCardMountPostSetup && syncCardMountProfile) {
       if (showSyncCard) {
@@ -1178,12 +1181,24 @@ async function refreshStatus() {
     }
 
     // Don't load dashboard data when forcing upload-only UI.
-    if (showSetup || !status.authenticated || forceUploadUi || (route && route.kind !== "dashboard")) {
+    if (
+      showSetup ||
+      !status.authenticated ||
+      forceUploadUi ||
+      showTokenGateExclusive ||
+      (route && route.kind !== "dashboard")
+    ) {
       clearDashboard();
     } else {
       loadDashboardData();
     }
-    if (!showSetup && !showLogin && status.authenticated && route?.kind === "data") {
+    if (
+      !showSetup &&
+      !showLogin &&
+      !showTokenGateExclusive &&
+      status.authenticated &&
+      route?.kind === "data"
+    ) {
       loadDataPage().catch((err) => console.error("loadDataPage failed:", err));
     }
 
@@ -1448,6 +1463,7 @@ async function submitLinkedinCredentials() {
 
 async function submitGithubPat() {
   const t = githubPatInput?.value?.trim();
+  const deployUrlEl = document.getElementById("deployRepoUrlInput");
   if (!t) {
     if (githubPatMsg) githubPatMsg.textContent = "Enter a GitHub personal access token.";
     return;
@@ -1455,10 +1471,12 @@ async function submitGithubPat() {
   if (githubPatMsg) githubPatMsg.textContent = "Saving…";
   if (btnSaveGithubPat) btnSaveGithubPat.disabled = true;
   try {
+    const payload = { githubPat: t };
+    if (deployUrlEl) payload.deployRepoUrl = deployUrlEl.value?.trim() ?? "";
     await getJson("/api/settings/developer", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ githubPat: t }),
+      body: JSON.stringify(payload),
     });
     if (githubPatMsg) githubPatMsg.textContent = "Saved.";
     if (githubPatInput) githubPatInput.value = "";
