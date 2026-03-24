@@ -686,8 +686,10 @@ document.addEventListener("click", async (ev) => {
     if (param === "archPage") u.searchParams.set("tab", "architectures");
   }
   if (route.page === "endorsements" && param === "endorsementsPage") {
-    u.searchParams.delete("tab");
-    u.searchParams.delete("recommendationsPage");
+    u.searchParams.set("tab", "endorsements");
+  }
+  if (route.page === "endorsements" && param === "recommendationsPage") {
+    u.searchParams.set("tab", "recommendations");
   }
   if (route.page === "monitoring") {
     if (param === "runsPage") {
@@ -795,11 +797,16 @@ function currentDataRoute() {
     };
   }
   if (page === "endorsements" || page === "recommendations") {
+    const url = new URL(window.location.href);
+    const tab = url.searchParams.get("tab");
+    const normalized = tab === "endorsements" || tab === "recommendations" ? tab : undefined;
+    const tabFromPath = page === "recommendations" ? "recommendations" : "endorsements";
     return {
       api: "/data/endorsements",
       title: "Endorsements",
       kind: "data",
       page: "endorsements",
+      endorsementsTab: normalized ?? tabFromPath,
     };
   }
   const title = capitalizePageTitle(
@@ -1027,15 +1034,30 @@ async function loadDataPage() {
         u.pathname = "/data/endorsements";
         cleaned = true;
       }
-      if (u.searchParams.has("tab") || u.searchParams.has("recommendationsPage")) {
-        u.searchParams.delete("tab");
-        u.searchParams.delete("recommendationsPage");
+      const activeTab = route?.endorsementsTab === "recommendations" ? "recommendations" : "endorsements";
+      if (u.searchParams.get("tab") !== activeTab) {
+        u.searchParams.set("tab", activeTab);
         cleaned = true;
       }
       if (cleaned) history.replaceState(null, "", u.toString());
 
       const sp = new URLSearchParams(window.location.search);
       dataPageContent.innerHTML = await getHtml(`/views/endorsements?${sp.toString()}`);
+
+      dataPageContent.onclick = async (ev) => {
+        const btn = ev.target?.closest?.("button[data-endorsements-tab]");
+        if (!btn) return;
+        const tabKey = btn.getAttribute("data-endorsements-tab");
+        if (!tabKey) return;
+        const nextTab = tabKey === "recommendations" ? "recommendations" : "endorsements";
+        const next = new URL(window.location.href);
+        next.searchParams.set("tab", nextTab);
+        next.searchParams.delete("endorsementsPage");
+        next.searchParams.delete("recommendationsPage");
+        history.pushState(null, "", next.toString());
+        syncSidebarActiveFromPath();
+        await loadDataPage();
+      };
     } else {
       throw new Error(`Unsupported page: ${route?.page ?? "(unknown)"}`);
     }

@@ -87,7 +87,7 @@ router.get("/skills", requireLogin, async (req, res) => {
 
 router.get("/endorsements", requireLogin, async (req, res) => {
   try {
-    const model = await viewsDataService.getEndorsementsViewModel(req);
+    const model = await viewsDataService.getEndorsementsViewModel(req, req.query.tab);
     res.render("partials/endorsements", {
       ...model,
       columnLabel,

@@ -1,8 +1,42 @@
-<div class="row">
-  <div class="dataPagePanel">
-    <div class="tableScroll">
-      <%- include("_dataTable", { rows: Array.isArray(endorsements) ? endorsements : [], columnLabel, formatDataTableCell }) %>
-    </div>
-    <%- include("_pagination", { pagination: endorsementsPagination }) %>
+<%
+  const defs = [
+    { key: "endorsements", label: "Endorsements" },
+    { key: "recommendations", label: "Recommendations" },
+  ];
+  const allowed = new Set(defs.map((d) => d.key));
+  const initial = allowed.has(activeTab) ? activeTab : "endorsements";
+  const tabRows = {
+    endorsements: Array.isArray(endorsements) ? endorsements : [],
+    recommendations: Array.isArray(recommendations) ? recommendations : [],
+  };
+%>
+
+<div class="row headerRow">
+  <div class="navTabs" role="tablist" aria-label="Endorsements tabs">
+    <% for (const d of defs) { %>
+      <% const isActive = d.key === initial; %>
+      <button
+        class="tabBtn"
+        type="button"
+        data-endorsements-tab="<%= d.key %>"
+        aria-selected="<%= isActive ? "true" : "false" %>"
+      >
+        <%= d.label %>
+      </button>
+    <% } %>
   </div>
+</div>
+
+<div id="endorsementsTabContent" class="row">
+  <% for (const d of defs) { %>
+    <% const isActive = d.key === initial; %>
+    <div class="endorsementsTabPanel<%= isActive ? "" : " hidden" %>" data-endorsements-panel="<%= d.key %>">
+      <div class="dataPagePanel">
+        <div class="tableScroll">
+          <%- include("_dataTable", { rows: tabRows[d.key], columnLabel, formatDataTableCell }) %>
+        </div>
+        <%- include("_pagination", { pagination: d.key === "endorsements" ? endorsementsPagination : recommendationsPagination }) %>
+      </div>
+    </div>
+  <% } %>
 </div>
