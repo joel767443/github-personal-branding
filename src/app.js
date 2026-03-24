@@ -835,6 +835,41 @@ app.get('/api/settings/developer', requireLogin, async (req, res) => {
   }
 });
 
+async function validateGithubPat(token) {
+  const t = String(token ?? '').trim();
+  if (!t) {
+    return { ok: false, details: 'Enter a GitHub personal access token.' };
+  }
+  try {
+    const resp = await fetch('https://api.github.com/user', {
+      headers: {
+        Authorization: `Bearer ${t}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+      },
+    });
+    if (resp.ok) return { ok: true };
+    const body = await resp.json().catch(() => ({}));
+    if (resp.status === 401) {
+      return { ok: false, details: 'Invalid GitHub token. Generate a new token and try again.' };
+    }
+    if (resp.status === 403) {
+      return {
+        ok: false,
+        details:
+          'GitHub rejected this token (forbidden). Check token permissions and that the token is active.',
+      };
+    }
+    const message =
+      typeof body?.message === 'string' && body.message.trim()
+        ? body.message.trim()
+        : `GitHub token validation failed (${resp.status}).`;
+    return { ok: false, details: message };
+  } catch {
+    return { ok: false, details: 'Could not verify GitHub token right now. Please try again.' };
+  }
+}
+
 app.patch('/api/settings/developer', requireLogin, async (req, res) => {
   try {
     const { developer } = await resolveDeveloperFromSession(req);
@@ -895,6 +930,10 @@ app.patch('/api/settings/developer', requireLogin, async (req, res) => {
     if (body.githubPat !== undefined) {
       const g = String(body.githubPat ?? '');
       if (g.trim()) {
+        const validatedPat = await validateGithubPat(g);
+        if (!validatedPat.ok) {
+          return respondError(res, 400, 'Invalid GitHub token', validatedPat.details);
+        }
         data.githubPatEnc = encryptField(g);
       }
     }
