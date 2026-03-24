@@ -94,6 +94,13 @@ app.use(express.urlencoded({ extended: true }));
 // MVC view layer: render EJS fragments under `src/views/`.
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
+function sessionCookieSecure() {
+  const raw = String(process.env.SESSION_COOKIE_SECURE ?? '').toLowerCase().trim();
+  if (raw === '0' || raw === 'false') return false;
+  if (raw === '1' || raw === 'true') return true;
+  return process.env.NODE_ENV === 'production';
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dev-only-session-secret-change-me',
   resave: false,
@@ -101,7 +108,7 @@ app.use(session({
   cookie: {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: sessionCookieSecure(),
     maxAge: 7 * 24 * 60 * 60 * 1000,
   },
 }));
@@ -451,6 +458,9 @@ app.get('/auth/github', async (req, res) => {
         creds.callbackUrl,
       );
     }
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => (err ? reject(err) : resolve()));
+    });
     res.redirect(url.toString());
   } catch (err) {
     respondError(res, 500, 'OAuth start failed', clientSafeMessage(err, 'OAuth start failed'));
@@ -461,7 +471,19 @@ app.get('/auth/github/callback', async (req, res) => {
   try {
     const { code, state } = req.query;
     if (!code || !state || state !== req.session.oauthState) {
-      return respondError(res, 400, 'Invalid OAuth state', 'State mismatch or missing code');
+      console.error('[github-oauth] callback state check failed', {
+        hasCode: Boolean(code),
+        hasStateParam: Boolean(state),
+        hasSessionState: Boolean(req.session.oauthState),
+        sessionIdPresent: Boolean(req.sessionID),
+        hint:
+          'Use SESSION_COOKIE_SECURE=false with http://localhost, or NODE_ENV=development. Do not restart the server between /auth/github and callback.',
+      });
+      const details =
+        process.env.NODE_ENV === 'production'
+          ? 'State mismatch or missing code'
+          : 'State mismatch or missing code. For http://localhost add SESSION_COOKIE_SECURE=false to .env, restart npm start, complete OAuth in one browser tab without restarting the server.';
+      return respondError(res, 400, 'Invalid OAuth state', details);
     }
 
     const creds = await resolveGithubOAuthAppCredentials(req);
@@ -625,6 +647,9 @@ app.get('/auth/facebook', async (req, res) => {
     const state = crypto.randomBytes(16).toString('hex');
     req.session.oauthFacebookState = state;
     req.session.oauthFacebookRedirectUri = redirectUri;
+    await new Promise((resolve, reject) => {
+      req.session.save((err) => (err ? reject(err) : resolve()));
+    });
     const url = new URL(`https://www.facebook.com/${graphV}/dialog/oauth`);
     url.searchParams.set('client_id', appId);
     url.searchParams.set('redirect_uri', redirectUri);
@@ -650,7 +675,23 @@ app.get('/auth/facebook/callback', async (req, res) => {
       const msg = errorDescription ? `${String(error)}: ${String(errorDescription)}` : String(error);
       return res.redirect(302, `/dashboard?facebook_error=${encodeURIComponent(msg.slice(0, 200))}`);
     }
-    if (!code || !state || state !== req.session.oauthFacebookState) {
+    if (!code) {
+      logFb('callback missing code', { hasQueryState: Boolean(state) });
+      return fail('missing_code');
+    }
+    if (!state) {
+      logFb('callback missing state param');
+      return fail('missing_state');
+    }
+    const expected = req.session.oauthFacebookState;
+    if (!expected || state !== expected) {
+      logFb('callback state mismatch', {
+        hasSessionState: Boolean(expected),
+        sessionIdPresent: Boolean(req.sessionID),
+        hint:
+          'Same browser tab, no server restart between /auth/facebook and callback. ' +
+          'If using http:// locally, set SESSION_COOKIE_SECURE=false (or NODE_ENV=development) so the session cookie is sent.',
+      });
       return fail('state');
     }
     const rawDevId = req.session?.user?.developerId;

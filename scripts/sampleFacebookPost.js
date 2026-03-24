@@ -6,8 +6,8 @@
  * Requires: DATABASE_URL, developer with `developer_facebook_auth_data`, REDIS_URL for enqueue,
  *            ENCRYPTION_MASTER_KEY if tokens are encrypted.
  *
- * Post body: Gemini + this repo’s GitHub activity unless SAMPLE_POST_USE_STATIC=1.
- * See sampleLinkedInPost.js header for GEMINI_API_KEY / GITHUB_ACTIVITY_REPO / etc.
+ * Post body: OpenAI (gpt-4o-mini) + this repo’s GitHub activity unless SAMPLE_POST_USE_STATIC=1.
+ * See sampleLinkedInPost.js header for OPENAI_API_KEY / GITHUB_ACTIVITY_REPO / etc.
  *
  * Usage:
  *   node scripts/sampleFacebookPost.js
@@ -23,6 +23,20 @@ const { enqueueSocialMediaPost } = require('../src/social/enqueueSocialMediaPost
 const { queuesEnabled } = require('../src/queue/jobQueues');
 const { executeSocialMediaPost } = require('../src/jobs/executeSocialMediaPost');
 const { generateSamplePostBody } = require('../src/services/samplePostGeminiContent');
+
+const FB_CONNECT_HELP = `
+No Facebook Page token in the database yet. Do this once:
+
+  1) Start the web app: npm start (PORT in .env; default 80 in code if unset).
+  2) Sign in with GitHub in the browser (/auth/github). This app sets session.user.developerId only after GitHub OAuth — visiting the site alone is not enough.
+  3) Open /auth/facebook (“Connect Facebook Page”). OAuth saves the Page to the same developerId as your session.
+  4) Finish Meta login. Success: /dashboard?facebook=connected
+     Failure: /dashboard?facebook_error=… (no_pages = Facebook Page you admin required; session = not logged in via GitHub; config = FACEBOOK_APP_ID/SECRET missing).
+
+Debug: node scripts/diagnoseFacebookAuth.js
+
+Then re-run this script. DEVELOPER_ID must match the developer row tied to the GitHub account you used in step 2.
+`.trim();
 
 function maskDbUrl() {
   const u = process.env.DATABASE_URL;
@@ -51,10 +65,9 @@ async function resolveDeveloperId() {
       select: { developerId: true },
     });
     if (!row) {
+      console.error(FB_CONNECT_HELP);
       throw new Error(
-        `No developer_facebook_auth_data for DEVELOPER_ID=${id}. ` +
-          `Table has ${fbCount} row(s). Re-run "Connect Facebook" and check the dashboard URL: ` +
-          `?facebook=connected means saved; ?facebook_error=… explains failures (e.g. no_pages, session).`,
+        `No developer_facebook_auth_data for DEVELOPER_ID=${id} (${fbCount} row(s) in table total).`,
       );
     }
     return id;
@@ -65,11 +78,8 @@ async function resolveDeveloperId() {
     orderBy: { id: 'asc' },
   });
   if (!row) {
-    throw new Error(
-      `No developer_facebook_auth_data rows (developers in DB: ${devCount}). ` +
-        `After OAuth, the URL must be /dashboard?facebook=connected — if you see facebook_error=…, ` +
-        `the row was not saved. Common: no_pages (no Facebook Page admin), session (lost cookie), token.`,
-    );
+    console.error(FB_CONNECT_HELP);
+    throw new Error(`No developer_facebook_auth_data rows (developers in DB: ${devCount}).`);
   }
   return row.developerId;
 }
