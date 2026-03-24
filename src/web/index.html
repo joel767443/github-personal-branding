@@ -14,6 +14,14 @@
         <div class="container">
       <div id="shellTopNav"></div>
 
+      <div class="card hidden tokenRequiredCard" id="githubTokenRequiredCard">
+        <h2>GitHub token required</h2>
+        <p class="muted">
+          No GitHub token is saved yet. Sync is blocked until you add one.
+          <a href="/github-token">Open GitHub token setup</a>.
+        </p>
+      </div>
+
       <div class="hidden" id="dashboardCard">
         <div class="tileRow">
           <div class="tileCount"><div class="tileTitle">Repos</div><div class="tileValue" id="statRepos"></div><div class="tileDelta">Owned repos processed</div></div>
@@ -115,25 +123,6 @@
             </div>
           </div>
         
-          <div class="row auth-field">
-            <label for="githubPatInput">GitHub personal access token</label>
-            <input id="githubPatInput" type="password" autocomplete="off" placeholder="Paste token to save" />
-          </div>
-          <div class="row auth-field">
-            <label for="deployRepoUrlInput">GitHub profile repository URL</label>
-            <input
-              id="deployRepoUrlInput"
-              type="text"
-              inputmode="url"
-              autocomplete="off"
-              placeholder="https://github.com/username/repo.git"
-            />
-          </div>
-          <div id="githubPatConfiguredHint" class="muted"></div>
-          <div class="row">
-            <button type="button" id="btnSaveGithubPat">Save GitHub token</button>
-          </div>
-          <div id="githubPatMsg" class="muted" aria-live="polite"></div>
           <div class="row">
             <button type="button" id="btnCheckout">Open Stripe checkout</button>
             <button type="button" id="btnPortal">Billing portal</button>

@@ -77,6 +77,7 @@ const startSyncBtn = document.getElementById("startSyncBtn");
 const pageTitle = document.getElementById("pageTitle");
 const sidebarEl = document.getElementById("sidebar");
 const topNavEl = document.getElementById("topNav");
+const githubTokenRequiredCard = document.getElementById("githubTokenRequiredCard");
 const dashboardCard = document.getElementById("dashboardCard");
 const settingsCard = document.getElementById("settingsCard");
 const settingsCardMountDefault = document.getElementById("settingsCardMountDefault");
@@ -93,7 +94,6 @@ const btnCheckout = document.getElementById("btnCheckout");
 const btnPortal = document.getElementById("btnPortal");
 const settingsMsg = document.getElementById("settingsMsg");
 const githubPatInput = document.getElementById("githubPatInput");
-const githubPatConfiguredHint = document.getElementById("githubPatConfiguredHint");
 const btnSaveGithubPat = document.getElementById("btnSaveGithubPat");
 const githubPatMsg = document.getElementById("githubPatMsg");
 const loginCard = document.getElementById("loginCard");
@@ -548,11 +548,6 @@ async function loadSettingsForm() {
     if (deployUrlField) deployUrlField.value = d.deployRepoUrl ?? "";
     // Secrets are never returned from the API (only *Configured flags); keep field empty for security.
     if (githubPatInput) githubPatInput.value = "";
-    if (githubPatConfiguredHint) {
-      githubPatConfiguredHint.textContent = d.githubPatConfigured
-        ? "A GitHub token is saved (paste a new one to replace it)."
-        : "No GitHub token saved yet.";
-    }
   } catch (_) {
     /* ignore */
   }
@@ -1080,6 +1075,13 @@ async function refreshStatus() {
     const forceUploadUi = route?.kind === "upload";
     const isDashboardRoute = route?.kind === "dashboard";
     const isProfilePage = (window.location.pathname || "") === "/profile";
+    const showTokenRequiredCard =
+      status.authenticated &&
+      !showSetup &&
+      !showLogin &&
+      Boolean(status.needsDeveloperCredentials) &&
+      Boolean(route) &&
+      (route.kind === "dashboard" || route.kind === "data");
 
     // Dashboard is only `/dashboard`, never on `/`, setup, login, or other routes.
     const showDashboard =
@@ -1089,6 +1091,7 @@ async function refreshStatus() {
     const hideShell = showSetup || showLogin || postSetupAwaitingAuth;
     setHidden(sidebarEl, hideShell);
     setHidden(topNavEl, hideShell);
+    setHidden(githubTokenRequiredCard, !showTokenRequiredCard || hideShell);
 
     const showDataPageCard =
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
@@ -1504,17 +1507,20 @@ saveSettingsBtn?.addEventListener("click", async () => {
   if (settingsMsg) settingsMsg.textContent = "Saving…";
   try {
     const deployUrlEl = document.getElementById("deployRepoUrlInput");
+    const payload = {
+      syncFrequency: syncFrequencySelect.value,
+      socialIntegrations: {
+        TWITTER: Boolean(socialTwitter?.checked),
+        LINKEDIN: Boolean(socialLinkedin?.checked),
+      },
+    };
+    if (deployUrlEl) {
+      payload.deployRepoUrl = deployUrlEl.value?.trim() ?? "";
+    }
     await getJson("/api/settings/developer", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        syncFrequency: syncFrequencySelect.value,
-        socialIntegrations: {
-          TWITTER: Boolean(socialTwitter?.checked),
-          LINKEDIN: Boolean(socialLinkedin?.checked),
-        },
-        deployRepoUrl: deployUrlEl?.value?.trim() ?? "",
-      }),
+      body: JSON.stringify(payload),
     });
     if (settingsMsg) settingsMsg.textContent = "Saved.";
     await loadSettingsForm();

@@ -1316,6 +1316,10 @@ app.get('/data/commits', (req, res) => {
   return res.status(404).send('Not found');
 });
 
+app.get('/github-token', (req, res) => {
+  res.sendFile(path.join(__dirname, 'web', 'github-token.html'));
+});
+
 app.get(['/dashboard', '/profile', '/data/:page', '/monitoring'], (req, res) => {
   res.sendFile(path.join(__dirname, 'web', 'index.html'));
 });
