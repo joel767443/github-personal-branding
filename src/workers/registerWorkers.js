@@ -76,7 +76,7 @@ function registerWorkers() {
   new Worker(
     LINKEDIN_QUEUE,
     async (job) => {
-      const { runId, developerId, zipPath } = job.data;
+      const { runId, developerId, zipPath, userLogin, nextSyncRunId } = job.data;
       progressBus.start(runId, { job: 'linkedin', label: 'LinkedIn import started', developerId });
       const onProgress = makeProgress(runId, 'linkedin');
       try {
@@ -94,6 +94,27 @@ function registerWorkers() {
           summary: 'LinkedIn import complete',
           metadata: importResult.stats,
         });
+        const chainedSyncRunId = String(nextSyncRunId || `run_${Date.now()}_after_linkedin`);
+        await startJobRun({
+          runId: chainedSyncRunId,
+          jobType: 'sync',
+          userLogin: userLogin ?? null,
+          developerId: developerId ?? null,
+        });
+        await addJobEvent({
+          runId: chainedSyncRunId,
+          label: 'Sync queued after LinkedIn import',
+          payload: { job: 'sync', queuedFrom: 'linkedin', linkedinRunId: runId },
+        });
+        await syncQueue.add(
+          'sync-after-linkedin',
+          {
+            runId: chainedSyncRunId,
+            developerId: developerId ?? null,
+            userLogin: userLogin ?? null,
+          },
+          { jobId: chainedSyncRunId },
+        );
       } catch (err) {
         progressBus.finish(false, err?.message ?? String(err), { job: 'linkedin' });
         await failJobRun({

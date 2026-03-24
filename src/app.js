@@ -167,9 +167,6 @@ let linkedinImportInProgress = false;
 let linkedinImportRunId = null;
 
 async function runSyncPipeline(req) {
-  if (linkedinImportInProgress) {
-    return { started: false, reason: 'linkedin_import_running', runId: linkedinImportRunId };
-  }
   const resolved = req ? await resolveDeveloperFromSession(req) : { developer: null, login: null };
   const developerId = resolved?.developer?.id ?? null;
   try {
@@ -1228,6 +1225,7 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
       }
 
       const runId = `linkedin_${Date.now()}`;
+      const syncRunId = `run_${Date.now()}_after_linkedin`;
       const fileBuffer = req.file.buffer;
       const developerId = developer.id;
       const originalName = req.file.originalname;
@@ -1247,12 +1245,13 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
         await addJobEvent({ runId, label: "LinkedIn import queued", payload: { job: "linkedin" } });
         await linkedinQueue.add(
           "linkedin",
-          { runId, developerId, zipPath: dest },
+          { runId, developerId, zipPath: dest, userLogin: login ?? null, nextSyncRunId: syncRunId },
           { jobId: runId },
         );
         return res.json({
           ok: true,
           runId,
+          syncRunId,
           started: true,
           queued: true,
           originalName,
@@ -1303,6 +1302,14 @@ app.post('/upload/linkedin', requireLogin, (req, res) => {
             summary: "LinkedIn import complete",
             metadata: importResult.stats,
           });
+          const syncStarted = await runSyncPipeline(req);
+          if (syncStarted?.started) {
+            await addJobEvent({
+              runId,
+              label: "GitHub sync queued after LinkedIn import",
+              payload: { job: "linkedin", syncRunId: syncStarted.runId },
+            });
+          }
         } catch (importErr) {
           progressBus.finish(false, importErr?.message ?? String(importErr), { job: "linkedin" });
           await failJobRun({

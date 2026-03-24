@@ -43,10 +43,9 @@ function applyLinkedinUploadUiVisibility(status) {
   if (!status) return;
   const showSetup = status.wizardStep === "setup";
   const showLogin = status.wizardStep === "login";
-  const isProfilePage = (window.location.pathname || "") === "/profile";
-  const showUploadCard = !showSetup && !showLogin && isProfilePage;
-  const uploadCard = document.getElementById("uploadCard");
-  setHidden(uploadCard, !showUploadCard);
+  const showUploadCard = !showSetup && !showLogin && status.wizardStep === "upload";
+  const uploadGateRoot = document.getElementById("linkedinUploadGateRoot");
+  setHidden(uploadGateRoot, !showUploadCard);
   const needsLi = Boolean(status.needsLinkedInCredentials);
   const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
   if (linkedinCredentialsSection) {
@@ -135,11 +134,13 @@ const dataPageTitle = document.getElementById("dataPageTitle");
 const dataPageSubtitle = document.getElementById("dataPageSubtitle");
 const dataPageContent = document.getElementById("dataPageContent");
 const POST_SETUP_AWAIT_GITHUB_KEY = "pdbs_await_github_after_setup";
+const POST_UPLOAD_DASHBOARD_KEY = "pdbs_show_dashboard_after_upload_start";
 
 let statusCache = null;
 let progressSSE = null;
 let dashboardLoading = false;
 let dataPageLoading = false;
+let dashboardRefreshTimer = null;
 /** @type {any[]} */
 const dashboardChartList = [];
 
@@ -1061,6 +1062,9 @@ async function refreshStatus() {
     const showLogin = status.wizardStep === "login";
     const showSync = status.wizardStep === "sync";
     const showUploadStep = status.wizardStep === "upload";
+    const uploadPipelineStarted =
+      sessionStorage.getItem(POST_UPLOAD_DASHBOARD_KEY) === "1" &&
+      (status.syncInProgress || status.linkedinImportInProgress || showUploadStep);
 
     if (
       (window.location.pathname || "/") === "/" &&
@@ -1083,14 +1087,19 @@ async function refreshStatus() {
       Boolean(status.needsDeveloperCredentials) &&
       Boolean(route) &&
       (route.kind === "dashboard" || route.kind === "data");
-    const showTokenGateExclusive = showTokenRequiredCard;
+    const showUploadGateExclusive = showUploadStep && !uploadPipelineStarted;
+    const showTokenGateExclusive = showTokenRequiredCard || showUploadGateExclusive;
 
     // Dashboard is only `/dashboard`, never on `/`, setup, login, or other routes.
     const showDashboard =
-      status.authenticated && !showSetup && !showLogin && isDashboardRoute;
+      status.authenticated &&
+      !showSetup &&
+      !showLogin &&
+      !postSetupAwaitingAuth &&
+      (isDashboardRoute || (showUploadStep && uploadPipelineStarted));
 
-    // Gentelella shell visibility: hide sidebar/topbar on Step 1, login, or post-setup Step 2 gate.
-    const hideShell = showSetup || showLogin || postSetupAwaitingAuth;
+    // Hide shell on setup/login/post-setup, and while upload gate is still blocking.
+    const hideShell = showSetup || showLogin || postSetupAwaitingAuth || showUploadGateExclusive;
     setHidden(sidebarEl, hideShell);
     setHidden(topNavEl, hideShell);
     setHidden(githubTokenGateRoot, !showTokenGateExclusive || hideShell);
@@ -1117,6 +1126,8 @@ async function refreshStatus() {
         ? "Sign in"
         : postSetupAwaitingAuth
           ? "Sync GitHub Data"
+          : showUploadGateExclusive
+            ? "Upload LinkedIn Export"
           : route
               ? (route.title || "Data")
               : forceUploadUi
@@ -1124,7 +1135,7 @@ async function refreshStatus() {
                 : "PDBS",
     );
 
-    const showAuthCard = (showSetup || showLogin) && !postSetupAwaitingAuth;
+    const showAuthCard = (showSetup || showLogin) && !postSetupAwaitingAuth && !showUploadGateExclusive;
     setHidden(loginCard, !showAuthCard || showTokenGateExclusive);
     if (serverConfigHint) {
       if (showSetup && (status.missing?.length ?? 0) > 0) {
@@ -1195,7 +1206,7 @@ async function refreshStatus() {
     if (
       !showSetup &&
       !showLogin &&
-      !showTokenGateExclusive &&
+      !showTokenRequiredCard &&
       status.authenticated &&
       route?.kind === "data"
     ) {
@@ -1268,8 +1279,15 @@ function openProgressSSE() {
       const linkedinProgressLog = document.getElementById("linkedinProgressLog");
       const logTarget = job === "linkedin" ? linkedinProgressLog : progressLog;
       addLog(`[${data.at}] ${data.label}`, null, logTarget ?? progressLog);
+      if (dashboardRefreshTimer) clearTimeout(dashboardRefreshTimer);
+      dashboardRefreshTimer = setTimeout(() => {
+        if ((window.location.pathname || "") === "/dashboard") {
+          loadDashboardData().catch(() => {});
+        }
+      }, 500);
       if (data.type === "done") {
         if (job === "linkedin") {
+          sessionStorage.removeItem(POST_UPLOAD_DASHBOARD_KEY);
           const uploadStatus = document.getElementById("uploadStatus");
           const uploadLinkedinZipBtn = document.getElementById("uploadLinkedinZipBtn");
           if (uploadStatus) uploadStatus.className = "ok";
@@ -1373,8 +1391,17 @@ async function handleLinkedinUpload() {
       throw new Error(detail || `Upload failed (${resp.status})`);
     }
     const kb = json.size != null ? (Number(json.size) / 1024).toFixed(1) : "?";
-    uploadStatus.textContent = `ZIP received (${kb} KB). Import started${json.runId ? ` — ${json.runId}` : ""}. Progress below.`;
+    sessionStorage.setItem(POST_UPLOAD_DASHBOARD_KEY, "1");
+    uploadStatus.textContent = json.syncRunId
+      ? `ZIP received (${kb} KB). LinkedIn import queued${json.runId ? ` — ${json.runId}` : ""}. GitHub repo sync queued${json.syncRunId ? ` — ${json.syncRunId}` : ""}.`
+      : `ZIP received (${kb} KB). LinkedIn import started${json.runId ? ` — ${json.runId}` : ""}. GitHub repo sync will start automatically right after LinkedIn import completes.`;
     addLog(`LinkedIn import job queued (${json.runId || "run"})`, "ok", linkedinProgressLog ?? progressLog);
+    if (json.syncRunId) {
+      addLog(`GitHub sync job queued (${json.syncRunId})`, "ok", linkedinProgressLog ?? progressLog);
+    }
+    window.history.replaceState(null, "", "/dashboard");
+    await refreshStatus();
+    await loadDashboardData();
   } catch (err) {
     uploadStatus.className = "err";
     uploadStatus.textContent = err.message || String(err);

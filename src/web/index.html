@@ -56,6 +56,55 @@
           </div>
         </div>
 
+        <div id="linkedinUploadGateRoot" class="tokenPageWrap hidden">
+          <div class="tokenPageCard card">
+            <h1>LinkedIn export upload</h1>
+            <p class="muted">
+              After saving your GitHub token, upload your LinkedIn data export ZIP to continue. Once uploaded, LinkedIn
+              processing and GitHub repo sync will run automatically in the background.
+            </p>
+
+            <div class="tokenInstructions">
+              <h2>How to export your LinkedIn ZIP</h2>
+              <ol>
+                <li>Go to LinkedIn Settings &amp; Privacy -&gt; Data privacy -&gt; Get a copy of your data.</li>
+                <li>Select <strong>Download larger data archive</strong> (or choose all data), then request archive.</li>
+                <li>When LinkedIn emails you, download the ZIP and upload that file below.</li>
+              </ol>
+            </div>
+
+            <div id="linkedinCredentialsSection" class="hidden">
+              <p class="muted">
+                Enter LinkedIn API credentials first. The access token is encrypted at rest.
+              </p>
+              <div class="row auth-field">
+                <label for="linkedinCredAccessToken">ACCESS_TOKEN</label>
+                <input id="linkedinCredAccessToken" type="password" autocomplete="off"
+                  placeholder="LinkedIn OAuth access token" />
+              </div>
+              <div class="row auth-field">
+                <label for="linkedinCredPersonId">PERSON_ID</label>
+                <input id="linkedinCredPersonId" type="text" autocomplete="off"
+                  placeholder="LinkedIn person / member id" />
+              </div>
+              <div class="row">
+                <button type="button" id="btnSaveLinkedinCredentials">Save LinkedIn credentials</button>
+              </div>
+              <div id="linkedinCredentialsMsg" class="muted auth-msg" aria-live="polite"></div>
+            </div>
+
+            <div class="row">
+              <label for="linkedinZip">LinkedIn ZIP file</label>
+              <input id="linkedinZip" type="file" accept=".zip" />
+            </div>
+            <div class="row">
+              <button id="uploadLinkedinZipBtn">Upload ZIP and start processing</button>
+            </div>
+            <div id="uploadStatus" class="muted"></div>
+            <div class="log" id="linkedinProgressLog" aria-live="polite"></div>
+          </div>
+        </div>
+
         <div class="hidden" id="dashboardCard">
           <div class="tileRow">
             <div class="tileCount">
@@ -167,7 +216,7 @@
         </div>
 
         <div id="settingsCardMountDefault">
-          <div class="card hidden" id="settingsCard">
+          <div class="profileHero hidden" id="settingsCard">
             <h2>Account and billing</h2>
             <p class="muted">Choose sync frequency (minimum every 2 days). Base plan and social add-ons are billed in
               Stripe.</p>
