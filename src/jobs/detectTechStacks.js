@@ -172,10 +172,11 @@ async function detectTechStacks({ onProgress, developerId } = {}) {
       }
       await Promise.all(
         successfulDetections.map((d) =>
-          prisma.repo.update({
-            where: { id: d.repoId },
-            data: { techStacksProcessedRepoUpdatedAt: d.repoUpdatedAt },
-          }),
+          prisma.$executeRaw`
+            UPDATE "Repo"
+            SET "tech_stacks_processed_repo_updated_at" = ${d.repoUpdatedAt}
+            WHERE "id" = ${d.repoId}
+          `,
         ),
       );
     }
