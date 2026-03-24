@@ -17,7 +17,8 @@
         <div id="shellTopNav"></div>
 
         <div id="githubTokenGateRoot" class="tokenPageWrap hidden">
-          <div class="tokenPageCard card">
+          <div id="githubTokenRequiredCard" class="tokenPageCard card">
+            <div class="gateSectionLabel">Step 1 of 2</div>
             <h1>GitHub token setup</h1>
             <p class="muted">
               Save your GitHub Personal Access Token and your profile repository URL so sync can run with your own
@@ -54,10 +55,11 @@
             </div>
             <div id="githubPatMsg" class="muted" aria-live="polite"></div>
           </div>
-        </div>
 
-        <div id="linkedinUploadGateRoot" class="tokenPageWrap hidden">
-          <div class="tokenPageCard card">
+          <div class="gateSectionDivider" aria-hidden="true"></div>
+
+          <div id="linkedinUploadGateRoot" class="tokenPageCard card hidden">
+            <div class="gateSectionLabel">Step 2 of 2</div>
             <h1>LinkedIn export upload</h1>
             <p class="muted">
               After saving your GitHub token, upload your LinkedIn data export ZIP to continue. Once uploaded, LinkedIn
@@ -67,9 +69,11 @@
             <div class="tokenInstructions">
               <h2>How to export your LinkedIn ZIP</h2>
               <ol>
-                <li>Go to LinkedIn Settings &amp; Privacy -&gt; Data privacy -&gt; Get a copy of your data.</li>
-                <li>Select <strong>Download larger data archive</strong> (or choose all data), then request archive.</li>
-                <li>When LinkedIn emails you, download the ZIP and upload that file below.</li>
+                <li>Sign in to LinkedIn, open <strong>Settings &amp; Privacy</strong>, then go to <strong>Data privacy</strong>.</li>
+                <li>Click <strong>Get a copy of your data</strong>.</li>
+                <li>Select <strong>Download larger data archive</strong> (recommended), or select all categories, then submit the request.</li>
+                <li>Wait for LinkedIn's email that your archive is ready, then click <strong>Download archive</strong>.</li>
+                <li>Save the downloaded <code>.zip</code> file and upload the same file below (do not unzip it).</li>
               </ol>
             </div>
 

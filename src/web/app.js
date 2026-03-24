@@ -43,7 +43,14 @@ function applyLinkedinUploadUiVisibility(status) {
   if (!status) return;
   const showSetup = status.wizardStep === "setup";
   const showLogin = status.wizardStep === "login";
-  const showUploadCard = !showSetup && !showLogin && status.wizardStep === "upload";
+  const shouldForceUploadGate =
+    Boolean(status.authenticated) &&
+    !showSetup &&
+    !showLogin &&
+    !Boolean(status.needsDeveloperCredentials) &&
+    !Boolean(status.linkedinCompleted) &&
+    !Boolean(status.linkedinImportInProgress);
+  const showUploadCard = !showSetup && !showLogin && (status.wizardStep === "upload" || shouldForceUploadGate);
   const uploadGateRoot = document.getElementById("linkedinUploadGateRoot");
   setHidden(uploadGateRoot, !showUploadCard);
   const needsLi = Boolean(status.needsLinkedInCredentials);
@@ -1083,10 +1090,17 @@ async function refreshStatus() {
     const showSetup = status.wizardStep === "setup";
     const showLogin = status.wizardStep === "login";
     const showSync = status.wizardStep === "sync";
-    const showUploadStep = status.wizardStep === "upload";
+    const shouldForceUploadGate =
+      Boolean(status.authenticated) &&
+      !showSetup &&
+      !showLogin &&
+      !Boolean(status.needsDeveloperCredentials) &&
+      !Boolean(status.linkedinCompleted) &&
+      !Boolean(status.linkedinImportInProgress);
+    const showUploadStep = status.wizardStep === "upload" || shouldForceUploadGate;
     const uploadPipelineStarted =
       sessionStorage.getItem(POST_UPLOAD_DASHBOARD_KEY) === "1" &&
-      (status.syncInProgress || status.linkedinImportInProgress || showUploadStep);
+      (status.syncInProgress || status.linkedinImportInProgress);
 
     if (
       (window.location.pathname || "/") === "/" &&
@@ -1124,7 +1138,7 @@ async function refreshStatus() {
     const hideShell = showSetup || showLogin || postSetupAwaitingAuth || showUploadGateExclusive;
     setHidden(sidebarEl, hideShell);
     setHidden(topNavEl, hideShell);
-    setHidden(githubTokenGateRoot, !showTokenGateExclusive || hideShell);
+    setHidden(githubTokenGateRoot, !showTokenGateExclusive);
     setHidden(githubTokenRequiredCard, !showTokenRequiredCard || hideShell);
 
     const showDataPageCard =

@@ -1545,6 +1545,28 @@ table.monitoringRunsTable {
   max-width: 760px;
 }
 
+.gateSectionLabel {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid #4c5c98;
+  background: rgba(76, 92, 152, 0.2);
+  color: #d7e0ff;
+  font-family: var(--pdbs-font-sans);
+  font-size: var(--pdbs-fs-caption);
+  font-weight: var(--pdbs-fw-heading);
+  line-height: var(--pdbs-lh-tight);
+  letter-spacing: 0.02em;
+}
+
+.gateSectionDivider {
+  width: 100%;
+  max-width: 760px;
+  border-top: 1px dashed #364070;
+  margin: 8px 0 18px;
+}
+
 .tokenInstructions {
   border: 1px solid #273056;
   border-radius: 8px;
