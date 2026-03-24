@@ -172,6 +172,7 @@ model Repo {
   url         String
   createdAt   DateTime
   updatedAt   DateTime
+  techStacksProcessedRepoUpdatedAt DateTime? @map("tech_stacks_processed_repo_updated_at")
 
   commits         Commit[]
   repoTechStacks  RepoTechStack[]

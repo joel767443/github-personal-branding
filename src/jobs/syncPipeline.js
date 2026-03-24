@@ -22,7 +22,7 @@ async function executeSyncPipeline({ developerId, onProgress, req }) {
   if (resolvedDeveloperId != null) {
     await aggregatePortfolioLanguages({ developerId: resolvedDeveloperId, onProgress: progress });
   }
-  await detectTechStacks({ onProgress: progress });
+  await detectTechStacks({ onProgress: progress, developerId: resolvedDeveloperId ?? undefined });
 
   await detectDeveloperArchitectures({ branch: 'main', onProgress: progress });
 

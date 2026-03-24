@@ -274,7 +274,16 @@ class DeveloperPortfolioPersistence {
   async upsertGithubRepo(input) {
     return prisma.repo.upsert({
       where: { id: input.id },
-      update: { developerId: input.developerId },
+      update: {
+        name: input.name,
+        fullName: input.fullName,
+        description: input.description,
+        private: input.private,
+        url: input.url,
+        createdAt: input.createdAt,
+        updatedAt: input.updatedAt,
+        developerId: input.developerId,
+      },
       create: {
         id: input.id,
         name: input.name,
