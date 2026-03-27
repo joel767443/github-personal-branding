@@ -16,7 +16,7 @@ const {
   omitIdDeveloperId,
   omitIdDeveloperSort,
   safeJson,
-} = require("../utils/prismaJson");
+} = require("./DataNormalizationService");
 
 const PAGE_SIZE_CV = 4;
 const PAGE_SIZE_REPOS_GRID = 16;
@@ -75,30 +75,37 @@ async function getProfileViewModel(req) {
 
 async function getExperienceViewModel(req) {
   const developerId = await currentDeveloperId(req);
-  const rows = await prisma.developerExperience.findMany({
-    where: { developerId },
-  });
+  const page = parsePage(req.query[PAGINATION_PARAMS.experience]);
+  const skip = (page - 1) * PAGE_SIZE_CV;
 
-  const sorted = [...rows].sort((a, b) => (a?.sortOrder ?? 0) - (b?.sortOrder ?? 0));
-  const mapped = sorted.map((r) => ({
+  const [rows, total] = await Promise.all([
+    prisma.developerExperience.findMany({
+      where: { developerId },
+      orderBy: { sortOrder: "asc" },
+      skip,
+      take: PAGE_SIZE_CV,
+    }),
+    prisma.developerExperience.count({ where: { developerId } }),
+  ]);
+
+  const mapped = rows.map((r) => ({
     title: r?.title ?? "",
     company: r?.company ?? "",
     dates: r?.dates ?? "",
     location: r?.location ?? "",
     description: r?.description ?? "",
   }));
-  const pr = paginateArray(mapped, {
-    page: parsePage(req.query[PAGINATION_PARAMS.experience]),
-    pageSize: PAGE_SIZE_CV,
-  });
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE_CV));
+
   return {
-    rows: pr.slice,
+    rows: mapped,
     pagination: {
       paramName: PAGINATION_PARAMS.experience,
-      page: pr.page,
-      pageSize: pr.pageSize,
-      total: pr.total,
-      totalPages: pr.totalPages,
+      page,
+      pageSize: PAGE_SIZE_CV,
+      total,
+      totalPages,
     },
   };
 }
@@ -139,68 +146,75 @@ async function getSkillsTabsViewModel(req, activeTab) {
   const allowedTabs = new Set(["skills", "developer-tech-stacks", "architectures"]);
   const initialTab = normalizeActiveTab(activeTab, allowedTabs, "skills");
 
-  const [skillsRaw, developerTechStacksRaw, architecturesRaw, reposCount] = await Promise.all([
+  const skillsPage = parsePage(req.query[PAGINATION_PARAMS.skills]);
+  const dtsPage = parsePage(req.query[PAGINATION_PARAMS.developerTechStacks]);
+  const archPage = parsePage(req.query[PAGINATION_PARAMS.architectures]);
+
+  const [
+    skillsRaw,
+    skillsTotal,
+    developerTechStacksRaw,
+    dtsTotal,
+    architecturesRaw,
+    archTotal,
+    reposCount,
+  ] = await Promise.all([
     prisma.developerLinkedinSkill.findMany({
       where: { developerId },
       orderBy: { sortOrder: "asc" },
       omit: omitIdDeveloperSort,
+      skip: (skillsPage - 1) * PAGE_SIZE_TABLE,
+      take: PAGE_SIZE_TABLE,
     }),
+    prisma.developerLinkedinSkill.count({ where: { developerId } }),
     prisma.developerTechStack.findMany({
       where: { developerId },
       orderBy: { percentage: "desc" },
       omit: omitIdDeveloperId,
+      skip: (dtsPage - 1) * PAGE_SIZE_TABLE,
+      take: PAGE_SIZE_TABLE,
     }),
+    prisma.developerTechStack.count({ where: { developerId } }),
     prisma.developerArchitecture.findMany({
       where: { developerId },
       omit: omitIdDeveloperId,
       include: { architecture: { omit: omitId } },
       orderBy: { count: "desc" },
+      skip: (archPage - 1) * PAGE_SIZE_TABLE,
+      take: PAGE_SIZE_TABLE,
     }),
+    prisma.developerArchitecture.count({ where: { developerId } }),
     prisma.repo.count({ where: { developerId } }),
   ]);
 
-  const skillsPr = paginateArray(skillsRaw, {
-    page: parsePage(req.query[PAGINATION_PARAMS.skills]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
-  const dtsPr = paginateArray(developerTechStacksRaw, {
-    page: parsePage(req.query[PAGINATION_PARAMS.developerTechStacks]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
-  const archSorted = [...architecturesRaw].sort(
-    (a, b) => Number(b?.count ?? 0) - Number(a?.count ?? 0),
-  );
-  const archPr = paginateArray(archSorted, {
-    page: parsePage(req.query[PAGINATION_PARAMS.architectures]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
+  const calcTotalPages = (total) => Math.max(1, Math.ceil(total / PAGE_SIZE_TABLE));
 
   return {
     activeTab: initialTab,
-    skills: skillsPr.slice,
-    developerTechStacks: dtsPr.slice,
-    architectures: archPr.slice,
+    skills: skillsRaw,
+    developerTechStacks: developerTechStacksRaw,
+    architectures: architecturesRaw,
     overview: { repos: reposCount },
     skillsPagination: {
       paramName: PAGINATION_PARAMS.skills,
-      page: skillsPr.page,
-      pageSize: skillsPr.pageSize,
-      total: skillsPr.total,
-      totalPages: skillsPr.totalPages,
+      page: skillsPage,
+      pageSize: PAGE_SIZE_TABLE,
+      total: skillsTotal,
+      totalPages: calcTotalPages(skillsTotal),
     },
     developerTechStacksPagination: {
       paramName: PAGINATION_PARAMS.developerTechStacks,
-      page: dtsPr.page,
-      pageSize: dtsPr.pageSize,
-      total: dtsPr.total,
-      totalPages: dtsPr.totalPages,
+      page: dtsPage,
+      pageSize: PAGE_SIZE_TABLE,
+      total: dtsTotal,
+      totalPages: calcTotalPages(dtsTotal),
     },
     architecturesPagination: {
       paramName: PAGINATION_PARAMS.architectures,
-      page: archPr.page,
-      pageSize: archPr.pageSize,
-      total: archPr.total,
-      totalPages: archPr.totalPages,
+      page: archPage,
+      pageSize: PAGE_SIZE_TABLE,
+      total: archTotal,
+      totalPages: calcTotalPages(archTotal),
     },
   };
 }
@@ -210,45 +224,47 @@ async function getEndorsementsViewModel(req, activeTab) {
   const allowedTabs = new Set(["endorsements", "recommendations"]);
   const initialTab = normalizeActiveTab(activeTab, allowedTabs, "endorsements");
 
-  const [endorsementsRaw, recommendationsRaw] = await Promise.all([
+  const endPage = parsePage(req.query[PAGINATION_PARAMS.endorsements]);
+  const recPage = parsePage(req.query[PAGINATION_PARAMS.recommendations]);
+
+  const [endorsementsRaw, endTotal, recommendationsRaw, recTotal] = await Promise.all([
     prisma.developerLinkedinReceivedEndorsement.findMany({
       where: { developerId },
       orderBy: { sortOrder: "asc" },
       omit: { ...omitIdDeveloperSort, ...endorsementApiOmit },
+      skip: (endPage - 1) * PAGE_SIZE_TABLE,
+      take: PAGE_SIZE_TABLE,
     }),
+    prisma.developerLinkedinReceivedEndorsement.count({ where: { developerId } }),
     prisma.developerRecommendation.findMany({
       where: { developerId },
       orderBy: { sortOrder: "asc" },
       omit: omitIdDeveloperSort,
+      skip: (recPage - 1) * PAGE_SIZE_TABLE,
+      take: PAGE_SIZE_TABLE,
     }),
+    prisma.developerRecommendation.count({ where: { developerId } }),
   ]);
 
-  const endPr = paginateArray(endorsementsRaw, {
-    page: parsePage(req.query[PAGINATION_PARAMS.endorsements]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
-  const recPr = paginateArray(recommendationsRaw, {
-    page: parsePage(req.query[PAGINATION_PARAMS.recommendations]),
-    pageSize: PAGE_SIZE_TABLE,
-  });
+  const calcTotalPages = (total) => Math.max(1, Math.ceil(total / PAGE_SIZE_TABLE));
 
   return {
     activeTab: initialTab,
-    endorsements: endPr.slice,
-    recommendations: recPr.slice,
+    endorsements: endorsementsRaw,
+    recommendations: recommendationsRaw,
     endorsementsPagination: {
       paramName: PAGINATION_PARAMS.endorsements,
-      page: endPr.page,
-      pageSize: endPr.pageSize,
-      total: endPr.total,
-      totalPages: endPr.totalPages,
+      page: endPage,
+      pageSize: PAGE_SIZE_TABLE,
+      total: endTotal,
+      totalPages: calcTotalPages(endTotal),
     },
     recommendationsPagination: {
       paramName: PAGINATION_PARAMS.recommendations,
-      page: recPr.page,
-      pageSize: recPr.pageSize,
-      total: recPr.total,
-      totalPages: recPr.totalPages,
+      page: recPage,
+      pageSize: PAGE_SIZE_TABLE,
+      total: recTotal,
+      totalPages: calcTotalPages(recTotal),
     },
   };
 }
@@ -270,40 +286,8 @@ function formatPercentage(n) {
   return num.toFixed(2);
 }
 
-function normalizeProjects(projectsRaw) {
-  return safeJson(projectsRaw).map((r) => {
-    const url = resolveProjectUrl(r?.url);
-    return {
-      ...r,
-      urlHref: url.href,
-      urlText: url.text,
-    };
-  });
-}
-
-async function getPortfolioTabsViewModel(req, activeTab) {
-  const developerId = await currentDeveloperId(req);
-  const allowedTabs = new Set(["repos", "projects"]);
-  const initialTab = normalizeActiveTab(activeTab, allowedTabs, "repos");
-
-  const [reposRaw, projectsRaw] = await Promise.all([
-    prisma.repo.findMany({
-      where: { developerId },
-      omit: omitIdDeveloperId,
-      include: {
-        languages: { omit: omitId },
-        repoTechStacks: { omit: omitId, orderBy: { score: "desc" } },
-      },
-      orderBy: { updatedAt: "desc" },
-    }),
-    prisma.project.findMany({
-      where: { developerId },
-      omit: omitIdDeveloperSort,
-      orderBy: { sortOrder: "asc" },
-    }),
-  ]);
-
-  const repos = safeJson(reposRaw).map((repo) => {
+function normalizeActiveRepos(reposRaw) {
+  return safeJson(reposRaw).map((repo) => {
     const name = repo?.name ?? repo?.fullName ?? "Unnamed repo";
     const url = resolveProjectUrl(repo?.url);
 
@@ -324,35 +308,70 @@ async function getPortfolioTabsViewModel(req, activeTab) {
       topLanguagesText: topLanguages.length > 0 ? topLanguages.join(", ") : "No language data",
     };
   });
+}
 
+function normalizeProjects(projectsRaw) {
+  return safeJson(projectsRaw).map((r) => {
+    const url = resolveProjectUrl(r?.url);
+    return {
+      ...r,
+      urlHref: url.href,
+      urlText: url.text,
+    };
+  });
+}
+
+async function getPortfolioTabsViewModel(req, activeTab) {
+  const developerId = await currentDeveloperId(req);
+  const allowedTabs = new Set(["repos", "projects"]);
+  const initialTab = normalizeActiveTab(activeTab, allowedTabs, "repos");
+
+  const reposPage = parsePage(req.query[PAGINATION_PARAMS.portfolioRepos]);
+  const projectsPage = parsePage(req.query[PAGINATION_PARAMS.portfolioProjects]);
+
+  const [reposRaw, reposTotal, projectsRaw, projectsTotal] = await Promise.all([
+    prisma.repo.findMany({
+      where: { developerId },
+      omit: omitIdDeveloperId,
+      include: {
+        languages: { omit: omitId },
+        repoTechStacks: { omit: omitId, orderBy: { score: "desc" } },
+      },
+      orderBy: { updatedAt: "desc" },
+      skip: (reposPage - 1) * PAGE_SIZE_REPOS_GRID,
+      take: PAGE_SIZE_REPOS_GRID,
+    }),
+    prisma.repo.count({ where: { developerId } }),
+    prisma.project.findMany({
+      where: { developerId },
+      omit: omitIdDeveloperSort,
+      orderBy: { sortOrder: "asc" },
+      skip: (projectsPage - 1) * PAGE_SIZE_CV,
+      take: PAGE_SIZE_CV,
+    }),
+    prisma.project.count({ where: { developerId } }),
+  ]);
+
+  const repos = normalizeActiveRepos(reposRaw);
   const projects = normalizeProjects(projectsRaw);
-
-  const reposPr = paginateArray(repos, {
-    page: parsePage(req.query[PAGINATION_PARAMS.portfolioRepos]),
-    pageSize: PAGE_SIZE_REPOS_GRID,
-  });
-  const projectsPr = paginateArray(projects, {
-    page: parsePage(req.query[PAGINATION_PARAMS.portfolioProjects]),
-    pageSize: PAGE_SIZE_CV,
-  });
 
   return {
     activeTab: initialTab,
-    repos: reposPr.slice,
-    projects: projectsPr.slice,
+    repos,
+    projects,
     reposPagination: {
       paramName: PAGINATION_PARAMS.portfolioRepos,
-      page: reposPr.page,
-      pageSize: reposPr.pageSize,
-      total: reposPr.total,
-      totalPages: reposPr.totalPages,
+      page: reposPage,
+      pageSize: PAGE_SIZE_REPOS_GRID,
+      total: reposTotal,
+      totalPages: Math.max(1, Math.ceil(reposTotal / PAGE_SIZE_REPOS_GRID)),
     },
     projectsPagination: {
       paramName: PAGINATION_PARAMS.portfolioProjects,
-      page: projectsPr.page,
-      pageSize: projectsPr.pageSize,
-      total: projectsPr.total,
-      totalPages: projectsPr.totalPages,
+      page: projectsPage,
+      pageSize: PAGE_SIZE_CV,
+      total: projectsTotal,
+      totalPages: Math.max(1, Math.ceil(projectsTotal / PAGE_SIZE_CV)),
     },
   };
 }

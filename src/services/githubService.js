@@ -7,29 +7,63 @@ const DEFAULT_HEADERS = {
   'X-GitHub-Api-Version': '2022-11-28',
 };
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Attaches rate limiting interceptors to an axios instance.
+ * @param {import('axios').AxiosInstance} instance
+ */
+function attachRateLimiter(instance) {
+  instance.interceptors.request.use(async (config) => {
+    // Basic jitter/throttle to prevent absolute bursts
+    await sleep(50);
+    return config;
+  });
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const { config, response } = error;
+      if (response && response.status === 403 && response.headers['x-ratelimit-remaining'] === '0') {
+        const resetTime = parseInt(response.headers['x-ratelimit-reset'], 10) * 1000;
+        const waitTime = resetTime - Date.now() + 1000;
+        if (waitTime > 0) {
+          console.warn(`GitHub Rate Limit Exceeded. Waiting for ${waitTime / 1000}s...`);
+          await sleep(waitTime);
+          return instance(config);
+        }
+      }
+      return Promise.reject(error);
+    }
+  );
+}
+
 /**
  * @param {string} token
  */
 function createGithubClient(token) {
-  return axios.create({
+  const instance = axios.create({
     baseURL: BASE_URL,
     headers: {
       ...DEFAULT_HEADERS,
       Authorization: `Bearer ${token}`,
     },
   });
+  attachRateLimiter(instance);
+  return instance;
 }
 
 /** Unauthenticated or env-token client; prefer `createGithubClient` with a token from `getGithubCredentialsForDeveloper`. */
 function getEnvGithubClient() {
   const token = String(process.env.GITHUB_TOKEN ?? '').trim();
-  if (!token) {
-    return axios.create({
-      baseURL: BASE_URL,
-      headers: { ...DEFAULT_HEADERS },
-    });
-  }
-  return createGithubClient(token);
+  const instance = axios.create({
+    baseURL: BASE_URL,
+    headers: token ? { ...DEFAULT_HEADERS, Authorization: `Bearer ${token}` } : { ...DEFAULT_HEADERS },
+  });
+  attachRateLimiter(instance);
+  return instance;
 }
 
 /**

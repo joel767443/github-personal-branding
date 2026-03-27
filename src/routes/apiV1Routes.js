@@ -8,8 +8,7 @@ const {
   developerDetailInclude,
   developerIntelligenceInclude,
 } = require("../constants/developerApiIncludes");
-const { safeJson } = require("../utils/prismaJson");
-const { stripDeveloperSecretsDeep } = require("../utils/developerApiSanitize");
+const { safeJson, stripDeveloperSecretsDeep } = require("../services/DataNormalizationService");
 const detectTechStacks = require("../jobs/detectTechStacks");
 const detectDeveloperArchitectures = require("../jobs/detectDeveloperArchitectures");
 const { assertCanRunPaidJobs } = require("../services/subscriptionAccess");

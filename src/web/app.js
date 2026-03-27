@@ -148,268 +148,6 @@ let progressSSE = null;
 let dashboardLoading = false;
 let dataPageLoading = false;
 let dashboardRefreshTimer = null;
-/** @type {any[]} */
-const dashboardChartList = [];
-
-const CHART_COLORS = {
-  text: "#b7c6ff",
-  grid: "#273056",
-  accent: "#26B99A",
-  warn: "#ff8f8f",
-  muted: "#4c5c98",
-  series: ["#26B99A", "#5b7cfa", "#e8a54b", "#c678dd", "#56b6c2", "#e06c75"],
-};
-
-function destroyDashboardCharts() {
-  while (dashboardChartList.length) {
-    const c = dashboardChartList.pop();
-    try {
-      c.destroy();
-    } catch (_) {
-      /* ignore */
-    }
-  }
-}
-
-function shortDayLabel(isoDate) {
-  if (!isoDate || String(isoDate).length < 10) return String(isoDate ?? "");
-  return String(isoDate).slice(5);
-}
-
-function renderDashboardCharts(analytics) {
-  destroyDashboardCharts();
-  if (typeof Chart === "undefined") return;
-  if (!analytics) return;
-
-  Chart.defaults.color = CHART_COLORS.text;
-  Chart.defaults.borderColor = CHART_COLORS.grid;
-
-  const mon = analytics.monitoring || {};
-  const runsSeries = mon.runsByDay || [];
-  const lineLabels = runsSeries.map((d) => shortDayLabel(d.date));
-  const runsData = runsSeries.map((d) => d.count);
-  const failData = (mon.failuresByDay || []).map((d) => d.count);
-
-  const lineCanvas = document.getElementById("chartMonitoringLine");
-  if (lineCanvas) {
-    dashboardChartList.push(
-      new Chart(lineCanvas, {
-        type: "line",
-        data: {
-          labels: lineLabels,
-          datasets: [
-            {
-              label: "Runs",
-              data: runsData,
-              borderColor: CHART_COLORS.accent,
-              backgroundColor: "rgba(38,185,154,0.15)",
-              fill: true,
-              tension: 0.2,
-            },
-            {
-              label: "Failures",
-              data: failData,
-              borderColor: CHART_COLORS.warn,
-              backgroundColor: "rgba(255,143,143,0.08)",
-              fill: true,
-              tension: 0.2,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: {
-              ticks: { maxRotation: 45, autoSkip: true, maxTicksLimit: 12 },
-            },
-            y: { beginAtZero: true, ticks: { precision: 0 } },
-          },
-          plugins: { legend: { position: "bottom" } },
-        },
-      }),
-    );
-  }
-
-  const statusRows = mon.jobStatus || [];
-  const stLabels = statusRows.length ? statusRows.map((r) => r.status) : ["No jobs"];
-  const stData = statusRows.length ? statusRows.map((r) => r.count) : [1];
-  const stColors = statusRows.length
-    ? CHART_COLORS.series.slice(0, Math.max(stLabels.length, 1))
-    : [CHART_COLORS.muted];
-
-  const statusCanvas = document.getElementById("chartJobStatus");
-  if (statusCanvas) {
-    dashboardChartList.push(
-      new Chart(statusCanvas, {
-        type: "doughnut",
-        data: {
-          labels: stLabels,
-          datasets: [{ data: stData, backgroundColor: stColors }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: "bottom" } },
-        },
-      }),
-    );
-  }
-
-  const typeChartRows =
-    Array.isArray(mon.jobTypeChart) && mon.jobTypeChart.length > 0
-      ? mon.jobTypeChart
-      : (mon.jobType || []).map((r) => ({ jobType: r.jobType, count: r.count, label: r.jobType }));
-  const tyLabels = typeChartRows.length ? typeChartRows.map((r) => r.label || r.jobType) : ["No jobs"];
-  const tyData = typeChartRows.length ? typeChartRows.map((r) => r.count) : [1];
-  const tyColors = typeChartRows.length
-    ? CHART_COLORS.series.slice(0, Math.max(tyLabels.length, 1))
-    : [CHART_COLORS.muted];
-
-  const typeCanvas = document.getElementById("chartJobType");
-  if (typeCanvas) {
-    dashboardChartList.push(
-      new Chart(typeCanvas, {
-        type: "doughnut",
-        data: {
-          labels: tyLabels,
-          datasets: [{ data: tyData, backgroundColor: tyColors }],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { position: "bottom" } },
-        },
-      }),
-    );
-  }
-
-  const end = analytics.endorsementsBySkill || [];
-  const endLabels = end.map((e) => e.skillName || "—");
-  const endCounts = end.map((e) => e.count);
-
-  const endCanvas = document.getElementById("chartEndorsements");
-  if (endCanvas) {
-    dashboardChartList.push(
-      new Chart(endCanvas, {
-        type: "bar",
-        data: {
-          labels: endLabels.length ? endLabels : ["No endorsements"],
-          datasets: [
-            {
-              label: "Endorsements",
-              data: endCounts.length ? endCounts : [0],
-              backgroundColor: CHART_COLORS.series[1],
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { ticks: { maxRotation: 45, minRotation: 0 } },
-            y: { beginAtZero: true, ticks: { precision: 0 } },
-          },
-          plugins: { legend: { display: false } },
-        },
-      }),
-    );
-  }
-
-  const stacks = analytics.techStacks || [];
-  const stackLabels = stacks.map((t) => t.name);
-  const stackPct = stacks.map((t) => t.percentage);
-
-  const stackCanvas = document.getElementById("chartTechStack");
-  if (stackCanvas) {
-    dashboardChartList.push(
-      new Chart(stackCanvas, {
-        type: "bar",
-        data: {
-          labels: stackLabels.length ? stackLabels : ["No tech stack data"],
-          datasets: [
-            {
-              label: "%",
-              data: stackLabels.length ? stackPct : [0],
-              backgroundColor: CHART_COLORS.accent,
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { x: { beginAtZero: true, max: 100 } },
-          plugins: { legend: { display: false } },
-        },
-      }),
-    );
-  }
-
-  const arch = analytics.architectures || [];
-  const archLabels = arch.map((a) => a.name);
-  const archCounts = arch.map((a) => a.count);
-
-  const archCanvas = document.getElementById("chartArchitecture");
-  if (archCanvas) {
-    dashboardChartList.push(
-      new Chart(archCanvas, {
-        type: "bar",
-        data: {
-          labels: archLabels.length ? archLabels : ["No patterns"],
-          datasets: [
-            {
-              label: "Repos",
-              data: archLabels.length ? archCounts : [0],
-              backgroundColor: CHART_COLORS.series[2],
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
-          plugins: { legend: { display: false } },
-        },
-      }),
-    );
-  }
-
-  const roles = (analytics.experience && analytics.experience.roles) || [];
-  const expLabels = roles.map((r) =>
-    r.label.length > 48 ? `${r.label.slice(0, 45)}…` : r.label,
-  );
-  const expData = roles.map((_, i) => roles.length - i);
-
-  const expCanvas = document.getElementById("chartExperience");
-  if (expCanvas) {
-    dashboardChartList.push(
-      new Chart(expCanvas, {
-        type: "bar",
-        data: {
-          labels: expLabels.length ? expLabels : ["No experience rows"],
-          datasets: [
-            {
-              label: "Roles",
-              data: expLabels.length ? expData : [0],
-              backgroundColor: CHART_COLORS.series[3],
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: {
-            x: { beginAtZero: true, ticks: { precision: 0 } },
-          },
-          plugins: { legend: { display: false } },
-        },
-      }),
-    );
-  }
-}
 
 function addLog(line, type, container) {
   const el = container ?? progressLog;
@@ -420,38 +158,6 @@ function addLog(line, type, container) {
   div.textContent = line;
   el.appendChild(div);
   el.scrollTop = el.scrollHeight;
-}
-
-function clearDashboard() {
-  destroyDashboardCharts();
-  if (!dashboardCard) return;
-  if (profileAvatar) {
-    setHidden(profileAvatar, true);
-    profileAvatar.src = "";
-  }
-  if (profileLogin) profileLogin.textContent = "";
-  if (profileName) profileName.textContent = "";
-  if (profilePhone) profilePhone.textContent = "";
-  if (profileEmail) profileEmail.textContent = "";
-  if (profileJobTitle) profileJobTitle.textContent = "";
-  if (profileHireable) profileHireable.textContent = "";
-  if (profileHeadline) profileHeadline.textContent = "";
-  if (profileSummary) profileSummary.textContent = "";
-  if (statDevelopers) statDevelopers.textContent = "";
-  if (statRepos) statRepos.textContent = "";
-  if (statCommits) statCommits.textContent = "";
-  if (statSkills) statSkills.textContent = "";
-  if (statEndorsements) statEndorsements.textContent = "";
-  if (statRecommendations) statRecommendations.textContent = "";
-  if (statExperiences) statExperiences.textContent = "";
-  if (statPublications) statPublications.textContent = "";
-  if (statArchitectures) statArchitectures.textContent = "";
-  if (statDeveloperTechStacks) statDeveloperTechStacks.textContent = "";
-  if (statDeveloperArchitectures) statDeveloperArchitectures.textContent = "";
-  if (statRunningJobs) statRunningJobs.textContent = "";
-  if (statFailures24h) statFailures24h.textContent = "";
-  if (statSocialPosts30d) statSocialPosts30d.textContent = "";
-  if (statLastJobStatus) statLastJobStatus.textContent = "";
 }
 
 function applyFacebookOAuthFlash() {
@@ -562,19 +268,12 @@ async function loadSettingsForm() {
   }
 }
 
+// Delegate to modular managers
 async function loadDashboardData() {
   if (dashboardLoading) return;
   dashboardLoading = true;
   try {
-    const [profile, stats, analytics, overview] = await Promise.all([
-      getJson("/profile/me"),
-      getJson("/dashboard/stats"),
-      getJsonOptional("/dashboard/analytics"),
-      getJsonOptional("/data/overview"),
-    ]);
-
-    const s = analytics?.summary;
-    const o = overview;
+    const profile = await ApiClient.getJson("/profile/me");
 
     if (profileAvatar) {
       if (profile?.avatarUrl) {
@@ -598,33 +297,9 @@ async function loadDashboardData() {
     if (profileHeadline) profileHeadline.textContent = profile?.headline ?? "";
     if (profileSummary) profileSummary.textContent = profile?.summary ?? "";
 
-    if (statDevelopers) statDevelopers.textContent = String(stats?.developers ?? "");
-    if (statRepos) statRepos.textContent = String(s?.repos ?? o?.repos ?? stats?.repos ?? "");
-    if (statCommits) statCommits.textContent = String(s?.commits ?? stats?.commits ?? "");
-    if (statSkills) statSkills.textContent = String(s?.skills ?? o?.skills ?? "");
-    if (statEndorsements) statEndorsements.textContent = String(s?.endorsements ?? o?.endorsements ?? "");
-    if (statRecommendations) statRecommendations.textContent = String(s?.recommendations ?? o?.recommendations ?? "");
-    if (statExperiences) statExperiences.textContent = String(s?.experiences ?? o?.experiences ?? "");
-    if (statPublications) statPublications.textContent = String(s?.publications ?? o?.publications ?? "");
-    if (statArchitectures) statArchitectures.textContent = String(s?.architecturesCatalog ?? stats?.architectures ?? "");
-    if (statDeveloperTechStacks) statDeveloperTechStacks.textContent = String(s?.developerTechStacks ?? stats?.developerTechStacks ?? "");
-    if (statDeveloperArchitectures) statDeveloperArchitectures.textContent = String(s?.developerArchitectures ?? stats?.developerArchitectures ?? "");
-    const mon = analytics?.monitoring ?? stats?.monitoring;
-    if (statRunningJobs) statRunningJobs.textContent = String(mon?.runningJobs ?? 0);
-    if (statFailures24h) statFailures24h.textContent = String(mon?.failures24h ?? 0);
-    if (statSocialPosts30d) statSocialPosts30d.textContent = String(mon?.socialPosts30d ?? 0);
-    if (statLastJobStatus) {
-      const a = mon?.lastSyncStatus ?? "-";
-      const b = mon?.lastImportStatus ?? "-";
-      const c = mon?.lastSocialStatus ?? "-";
-      statLastJobStatus.textContent = `Sync: ${a} · LinkedIn: ${b} · Social: ${c}`;
-    }
-
-    renderDashboardCharts(analytics);
-
+    await DashboardManager.loadAll();
     await loadSettingsForm();
 
-    // Sidebar profile (Gentelella-like)
     if (sidebarAvatar) {
       if (profile?.avatarUrl) {
         sidebarAvatar.src = profile.avatarUrl;
@@ -637,11 +312,12 @@ async function loadDashboardData() {
     if (sidebarPhone) sidebarPhone.textContent = profilePhone.textContent || "";
     if (sidebarEmail) sidebarEmail.textContent = profileEmail.textContent || "";
   } catch (err) {
-    // Keep UI quiet; user will see a blank dashboard if API fails.
+    // Keep UI quiet
   } finally {
     dashboardLoading = false;
   }
 }
+
 
 /** Ensures the displayed page title starts with an uppercase letter. Other casing is unchanged. */
 function capitalizePageTitle(s) {

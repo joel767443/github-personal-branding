@@ -1,11 +1,12 @@
 const prisma = require("../db/prisma");
+const socketService = require("./SocketService");
 const {
   sanitizeJobFailureDetails,
   sanitizeJobFailureStack,
 } = require("../utils/safeClientError");
 
 async function startJobRun({ runId, jobType, userLogin = null, developerId = null, metadata = null }) {
-  await prisma.jobRun.upsert({
+  const run = await prisma.jobRun.upsert({
     where: { id: runId },
     update: {
       jobType,
@@ -26,11 +27,14 @@ async function startJobRun({ runId, jobType, userLogin = null, developerId = nul
       metadata,
     },
   });
+  if (developerId) {
+    socketService.notifyDashboardUpdate(developerId, "job_status", { runId, status: "running", jobType });
+  }
 }
 
-async function addJobEvent({ runId, level = "info", label, payload = null }) {
+async function addJobEvent({ runId, level = "info", label, payload = null, developerId = null }) {
   if (!runId || !label) return;
-  await prisma.jobEvent.create({
+  const event = await prisma.jobEvent.create({
     data: {
       runId,
       level,
@@ -38,11 +42,20 @@ async function addJobEvent({ runId, level = "info", label, payload = null }) {
       payload,
     },
   });
+
+  let devId = developerId;
+  if (!devId) {
+    const run = await prisma.jobRun.findUnique({ where: { id: runId }, select: { developerId: true } });
+    devId = run?.developerId;
+  }
+  if (devId) {
+    socketService.notifyDashboardUpdate(devId, "job_event", { runId, level, label, payload });
+  }
 }
 
 async function failJobRun({ runId, message, code = null, details = null, stack = null }) {
   if (!runId) return;
-  await prisma.$transaction([
+  const [failure, run] = await prisma.$transaction([
     prisma.jobFailure.create({
       data: {
         runId,
@@ -61,11 +74,14 @@ async function failJobRun({ runId, message, code = null, details = null, stack =
       },
     }),
   ]);
+  if (run.developerId) {
+    socketService.notifyDashboardUpdate(run.developerId, "job_status", { runId, status: "failed", message });
+  }
 }
 
 async function completeJobRun({ runId, summary = null, metadata = null }) {
   if (!runId) return;
-  await prisma.jobRun.update({
+  const run = await prisma.jobRun.update({
     where: { id: runId },
     data: {
       status: "completed",
@@ -74,6 +90,9 @@ async function completeJobRun({ runId, summary = null, metadata = null }) {
       metadata,
     },
   });
+  if (run.developerId) {
+    socketService.notifyDashboardUpdate(run.developerId, "job_status", { runId, status: "completed", summary });
+  }
 }
 
 function clampInt(n, min, max, fallback) {

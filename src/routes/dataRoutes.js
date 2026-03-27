@@ -9,8 +9,8 @@ const {
   omitIdDeveloperId,
   omitIdDeveloperSort,
   safeJson,
-} = require("../utils/prismaJson");
-const { sanitizeDeveloperForClient } = require("../utils/developerApiSanitize");
+  sanitizeDeveloperForClient,
+} = require("../services/DataNormalizationService");
 
 const router = express.Router();
 
@@ -65,6 +65,20 @@ router.get("/data/overview", requireLogin, async (req, res) => {
     });
   } catch (err) {
     respondError(res, 500, "Failed to fetch data overview", err?.message ?? String(err));
+  }
+});
+
+router.get("/profile/me", requireLogin, async (req, res) => {
+  const developerId = await currentDeveloperId(req, res);
+  if (developerId == null) return;
+  try {
+    const developer = await prisma.developer.findUnique({
+      where: { id: developerId }
+    });
+    if (!developer) return respondError(res, 404, "Not found");
+    res.json(sanitizeDeveloperForClient(developer));
+  } catch (err) {
+    respondError(res, 500, "Failed to fetch profile", err.message);
   }
 });
 

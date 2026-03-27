@@ -1,232 +1,98 @@
 const prisma = require("../db/prisma");
-const { formatJobTypeLabel } = require("../utils/jobTypeLabels");
 
-const TOP_STACKS = 12;
-const TOP_ARCH = 12;
-const TOP_ENDORSE_SKILLS = 12;
-const TOP_EXPERIENCE = 10;
-const MONITORING_DAYS = 30;
+class DashboardAnalyticsService {
+  getDashboardAnalytics = async (developerId) => {
+    if (!developerId) return this.emptyStats();
 
-function utcDayKey(d) {
-  const x = new Date(d);
-  return x.toISOString().slice(0, 10);
-}
+    const [monitoring, techStacks, architectures, endorsements, experience] = await Promise.all([
+      this.getMonitoringStats(developerId),
+      this.getTechStackStats(developerId),
+      this.getArchitectureStats(developerId),
+      this.getEndorsementStats(developerId),
+      this.getExperienceStats(developerId),
+    ]);
 
-function lastNDaysKeys(n) {
-  const keys = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const t = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
-    keys.push(t.toISOString().slice(0, 10));
-  }
-  return keys;
-}
-
-function bucketCountsByDay(rows, getDate) {
-  const map = new Map();
-  for (const row of rows) {
-    const k = utcDayKey(getDate(row));
-    map.set(k, (map.get(k) ?? 0) + 1);
-  }
-  return map;
-}
-
-/**
- * @param {number} developerId
- */
-async function getDashboardAnalytics(developerId) {
-  const dayKeys = lastNDaysKeys(MONITORING_DAYS);
-  const rangeStart = new Date(`${dayKeys[0]}T00:00:00.000Z`);
-  const now = new Date();
-
-  const jobWhere = { developerId };
-
-  const [
-    experiences,
-    education,
-    certifications,
-    projects,
-    skills,
-    endorsementsCount,
-    recommendations,
-    publications,
-    repos,
-    endorsementGroups,
-    techStacks,
-    architectures,
-    experienceRows,
-    jobRunsInRange,
-    failuresInRange,
-    statusGroups,
-    typeGroups,
-    runningJobsCount,
-    failures24hCount,
-    lastSync,
-    lastLinkedin,
-    lastSocial,
-    socialPostsCompleted30d,
-    commitsCount,
-    developerTechStacksCount,
-    developerArchitecturesCount,
-    architecturesCatalogCount,
-    totalJobRuns,
-  ] = await Promise.all([
-    prisma.developerExperience.count({ where: { developerId } }),
-    prisma.education.count({ where: { developerId } }),
-    prisma.certification.count({ where: { developerId } }),
-    prisma.project.count({ where: { developerId } }),
-    prisma.developerLinkedinSkill.count({ where: { developerId } }),
-    prisma.developerLinkedinReceivedEndorsement.count({ where: { developerId } }),
-    prisma.developerRecommendation.count({ where: { developerId } }),
-    prisma.developerPublication.count({ where: { developerId } }),
-    prisma.repo.count({ where: { developerId } }),
-    prisma.developerLinkedinReceivedEndorsement.groupBy({
-      by: ["skillName"],
-      where: { developerId, skillName: { not: null } },
-      _count: true,
-    }),
-    prisma.developerTechStack.findMany({
-      where: { developerId },
-      orderBy: { percentage: "desc" },
-      take: TOP_STACKS,
-      select: { name: true, percentage: true },
-    }),
-    prisma.developerArchitecture.findMany({
-      where: { developerId },
-      orderBy: { count: "desc" },
-      take: TOP_ARCH,
-      select: { name: true, count: true },
-    }),
-    prisma.developerExperience.findMany({
-      where: { developerId },
-      orderBy: { sortOrder: "asc" },
-      take: TOP_EXPERIENCE,
-      select: { title: true, company: true },
-    }),
-    prisma.jobRun.findMany({
-      where: {
-        ...jobWhere,
-        startedAt: { gte: rangeStart, lte: now },
+    return {
+      summary: {
+        repos: await prisma.repo.count({ where: { developerId } }),
+        commits: await prisma.commit.count({ where: { repo: { developerId } } }),
+        skills: await prisma.developerLinkedinSkill.count({ where: { developerId } }),
+        endorsements: await prisma.developerLinkedinReceivedEndorsement.count({ where: { developerId } }),
+        recommendations: await prisma.developerRecommendation.count({ where: { developerId } }),
+        experiences: await prisma.developerExperience.count({ where: { developerId } }),
+        publications: await prisma.developerPublication.count({ where: { developerId } }),
+        architecturesCatalog: await prisma.architecture.count(),
+        developerTechStacks: techStacks.length,
+        developerArchitectures: architectures.length,
       },
-      select: { startedAt: true },
-    }),
-    prisma.jobFailure.findMany({
-      where: {
-        occurredAt: { gte: rangeStart, lte: now },
-        run: { developerId },
-      },
-      select: { occurredAt: true },
-    }),
-    prisma.jobRun.groupBy({
-      by: ["status"],
-      where: jobWhere,
-      _count: true,
-    }),
-    prisma.jobRun.groupBy({
-      by: ["jobType"],
-      where: jobWhere,
-      _count: true,
-    }),
-    prisma.jobRun.count({ where: { ...jobWhere, status: "running" } }),
-    prisma.jobFailure.count({
-      where: {
-        occurredAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
-        run: { developerId },
-      },
-    }),
-    prisma.jobRun.findFirst({
-      where: { ...jobWhere, jobType: "sync" },
-      orderBy: { startedAt: "desc" },
-    }),
-    prisma.jobRun.findFirst({
-      where: { ...jobWhere, jobType: "linkedin" },
-      orderBy: { startedAt: "desc" },
-    }),
-    prisma.jobRun.findFirst({
-      where: { ...jobWhere, jobType: "social_media" },
-      orderBy: { startedAt: "desc" },
-    }),
-    prisma.jobRun.count({
-      where: {
-        ...jobWhere,
-        jobType: "social_media",
-        status: "completed",
-        startedAt: { gte: rangeStart, lte: now },
-      },
-    }),
-    prisma.commit.count({
-      where: { repo: { developerId } },
-    }),
-    prisma.developerTechStack.count({ where: { developerId } }),
-    prisma.developerArchitecture.count({ where: { developerId } }),
-    prisma.architecture.count(),
-    prisma.jobRun.count({ where: jobWhere }),
-  ]);
+      monitoring,
+      techStacks,
+      architectures,
+      endorsementsBySkill: endorsements,
+      experience,
+    };
+  };
 
-  const runsByDayMap = bucketCountsByDay(jobRunsInRange, (r) => r.startedAt);
-  const failuresByDayMap = bucketCountsByDay(failuresInRange, (r) => r.occurredAt);
+  getMonitoringStats = async (developerId) => {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-  const runsByDay = dayKeys.map((d) => ({ date: d, count: runsByDayMap.get(d) ?? 0 }));
-  const failuresByDay = dayKeys.map((d) => ({ date: d, count: failuresByDayMap.get(d) ?? 0 }));
+    const [runsByDay, failuresByDay, jobStatus, jobType] = await Promise.all([
+      prisma.$queryRaw`SELECT DATE(started_at) as date, COUNT(*)::int as count FROM job_runs WHERE developer_id = ${developerId} AND started_at >= ${thirtyDaysAgo} GROUP BY DATE(started_at) ORDER BY date ASC`,
+      prisma.$queryRaw`SELECT DATE(occurred_at) as date, COUNT(*)::int as count FROM job_failures f JOIN job_runs r ON f.run_id = r.id WHERE r.developer_id = ${developerId} AND occurred_at >= ${thirtyDaysAgo} GROUP BY DATE(occurred_at) ORDER BY date ASC`,
+      prisma.jobRun.groupBy({ by: ['status'], _count: true, where: { developerId, startedAt: { gte: thirtyDaysAgo } } }),
+      prisma.jobRun.groupBy({ by: ['jobType'], _count: true, where: { developerId, startedAt: { gte: thirtyDaysAgo } } }),
+    ]);
 
-  const endorsementsBySkill = endorsementGroups
-    .filter((g) => g.skillName)
-    .map((g) => ({ skillName: g.skillName, count: g._count }))
-    .sort((a, b) => b.count - a.count)
-    .slice(0, TOP_ENDORSE_SKILLS);
-
-  const experienceBars = experienceRows.map((r) => {
-    const t = (r.title || "").trim();
-    const c = (r.company || "").trim();
-    let label = t || c || "Role";
-    if (t && c) label = `${t} — ${c}`;
-    return { label, title: t || null, company: c || null };
-  });
-
-  return {
-    summary: {
-      experiences,
-      education,
-      certifications,
-      projects,
-      skills,
-      endorsements: endorsementsCount,
-      recommendations,
-      publications,
-      repos,
-      commits: commitsCount,
-      developerTechStacks: developerTechStacksCount,
-      developerArchitectures: developerArchitecturesCount,
-      architecturesCatalog: architecturesCatalogCount,
-    },
-    endorsementsBySkill,
-    techStacks,
-    architectures,
-    experience: {
-      count: experiences,
-      roles: experienceBars,
-    },
-    monitoring: {
+    return {
       runsByDay,
       failuresByDay,
-      jobStatus: statusGroups.map((g) => ({ status: g.status, count: g._count })),
-      jobType: typeGroups.map((g) => ({ jobType: g.jobType, count: g._count })),
-      jobTypeChart: typeGroups.map((g) => ({
-        jobType: g.jobType,
-        count: g._count,
-        label: formatJobTypeLabel(g.jobType, null),
-      })),
-      runningJobs: runningJobsCount,
-      failures24h: failures24hCount,
-      lastSyncStatus: lastSync?.status ?? null,
-      lastImportStatus: lastLinkedin?.status ?? null,
-      lastSocialStatus: lastSocial?.status ?? null,
-      socialPosts30d: socialPostsCompleted30d,
-      totalRuns: totalJobRuns,
-    },
+      jobStatus: jobStatus.map(s => ({ status: s.status, count: s._count })),
+      jobType: jobType.map(t => ({ jobType: t.jobType, count: t._count })),
+      failures24h: await prisma.jobFailure.count({ where: { occurredAt: { gte: dayAgo }, run: { developerId } } }),
+      runningJobs: await prisma.jobRun.count({ where: { developerId, status: 'running' } }),
+    };
+  };
+
+  getTechStackStats = async (developerId) => {
+    return prisma.developerTechStack.findMany({
+      where: { developerId },
+      orderBy: { percentage: 'desc' },
+      take: 10
+    });
+  };
+
+  getArchitectureStats = async (developerId) => {
+    return prisma.developerArchitecture.findMany({
+      where: { developerId },
+      orderBy: { count: 'desc' },
+      take: 10
+    });
+  };
+
+  getEndorsementStats = async (developerId) => {
+    const raw = await prisma.developerLinkedinReceivedEndorsement.groupBy({
+      by: ['skillName'],
+      _count: true,
+      where: { developerId },
+      orderBy: { _count: { skillName: 'desc' } },
+      take: 10
+    });
+    return raw.map(r => ({ skillName: r.skillName, count: r._count }));
+  };
+
+  getExperienceStats = async (developerId) => {
+    const roles = await prisma.developerExperience.findMany({
+      where: { developerId },
+      orderBy: { sortOrder: 'asc' },
+      select: { title: true, company: true }
+    });
+    return { roles: roles.map(r => ({ label: `${r.title} at ${r.company}` })) };
+  };
+
+  emptyStats = () => {
+    return { summary: {}, monitoring: { runsByDay: [], failuresByDay: [], jobStatus: [], jobType: [] }, techStacks: [], architectures: [], endorsementsBySkill: [], experience: { roles: [] } };
   };
 }
 
-module.exports = {
-  getDashboardAnalytics,
-};
+module.exports = new DashboardAnalyticsService();

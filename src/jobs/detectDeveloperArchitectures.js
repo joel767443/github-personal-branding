@@ -6,10 +6,7 @@ const {
   getRepoGitTreeFilesWithBranchFallback,
 } = require("../services/githubService");
 const { getGithubCredentialsForDeveloper } = require("../services/developerCredentials");
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const AhoCorasick = require("../utils/stringMatcher");
 
 const ARCH_KEYWORDS = {
   "Monolithic Architecture": ["monolith", "monolithic", "single codebase", "all-in-one"],
@@ -59,11 +56,18 @@ const ARCH_KEYWORDS = {
   "Resilient Architecture": ["fault tolerant", "resilience", "circuit breaker", "retry pattern", "bulkhead", "failover"],
 };
 
-const ARCH_KEYWORDS_LOWER = Object.fromEntries(
-  Object.entries(ARCH_KEYWORDS).map(([arch, keywords]) => [arch, keywords.map((k) => String(k).toLowerCase())]),
-);
+// Map keywords to architecture names for lookup
+const keywordToArch = {};
+const allKeywords = [];
+for (const [arch, keywords] of Object.entries(ARCH_KEYWORDS)) {
+  for (const kw of keywords) {
+    const lkw = kw.toLowerCase();
+    keywordToArch[lkw] = arch;
+    allKeywords.push(lkw);
+  }
+}
+const archMatcher = new AhoCorasick(allKeywords);
 
-/** `DeveloperArchitecture.name` FKs to `Architecture.name`; rows must exist before linking. */
 async function ensureArchitectureRowsForKeywords() {
   const names = Object.keys(ARCH_KEYWORDS);
   if (names.length === 0) return;
@@ -79,35 +83,20 @@ async function rebuildArchitectureCatalogFromDeveloperLinks() {
     _sum: { count: true },
   });
   await prisma.$transaction(async (tx) => {
-    const names = grouped.map((g) => g.name);
-
-    // Do not truncate `architectures`: `DeveloperArchitecture.name` FK uses onDelete: Cascade.
-    // Truncating parents would wipe child rows we just inserted.
     for (const g of grouped) {
       await tx.architecture.upsert({
         where: { name: g.name },
-        create: {
-          name: g.name,
-          count: g._sum.count ?? 0,
-        },
-        update: {
-          count: g._sum.count ?? 0,
-        },
+        create: { name: g.name, count: g._sum.count ?? 0 },
+        update: { count: g._sum.count ?? 0 },
       });
     }
-
-    // Remove catalog rows that are no longer referenced.
+    const names = grouped.map((g) => g.name);
     await tx.architecture.deleteMany({
       where: names.length > 0 ? { name: { notIn: names } } : undefined,
     });
   });
 }
 
-/**
- * @param {{ branch?: string, onProgress?: function, developerId?: number }} opts
- * When `developerId` is set, only that tenant's repos are scanned and only their
- * `developer_architectures` rows are replaced; the global `architectures` catalog is rebuilt from all per-developer rows.
- */
 async function detectDeveloperArchitectures({ branch = "main", onProgress, developerId } = {}) {
   const progress = typeof onProgress === "function" ? onProgress : () => {};
   const githubCache = new Map();
@@ -122,121 +111,73 @@ async function detectDeveloperArchitectures({ branch = "main", onProgress, devel
 
   const repos = await prisma.repo.findMany({
     where: developerId != null ? { developerId } : undefined,
-    select: {
-      id: true,
-      name: true,
-      fullName: true,
-      description: true,
-      developerId: true,
-    },
+    select: { id: true, name: true, fullName: true, description: true, developerId: true },
   });
 
   const devArchitectures = new Map();
   let skipped = 0;
-  progress("Detecting architectures", {
-    totalRepos: repos.length,
-    branch,
-    scopedDeveloperId: developerId ?? null,
-  });
+  progress("Detecting architectures", { totalRepos: repos.length, branch, scopedDeveloperId: developerId ?? null });
 
-  for (let idx = 0; idx < repos.length; idx++) {
-    const repo = repos[idx];
+  for (const repo of repos) {
     const github = await githubForRepoDeveloper(repo.developerId);
+    if (!repo.fullName || !repo.fullName.includes("/")) { skipped++; continue; }
 
-    const fullName = repo.fullName || `${repo.name}`;
-    if (!fullName || !fullName.includes("/")) {
-      skipped += 1;
-      continue;
-    }
-
-    const [owner, repoName] = fullName.split("/", 2);
-    if (!owner || !repoName) {
-      skipped += 1;
-      continue;
-    }
-
-    let topics = [];
+    const [owner, repoName] = repo.fullName.split("/", 2);
+    let topics = [], files = [];
     try {
-      topics = await getRepoTopics(github, owner, repoName);
-    } catch {
-      topics = [];
-    }
-
-    let files = [];
-    try {
-      files = await getRepoGitTreeFilesWithBranchFallback(github, owner, repoName, branch);
-    } catch {
-      files = [];
-    }
+      [topics, files] = await Promise.all([
+        getRepoTopics(github, owner, repoName).catch(() => []),
+        getRepoGitTreeFilesWithBranchFallback(github, owner, repoName, branch).catch(() => []),
+      ]);
+    } catch { skipped++; continue; }
 
     const text = [
-      String(repo.name ?? "").toLowerCase(),
-      String(repo.description ?? "").toLowerCase(),
-      topics.map((t) => String(t).toLowerCase()).join(" "),
+      String(repo.name ?? ""),
+      String(repo.description ?? ""),
+      topics.join(" "),
       files.join(" "),
-    ]
-      .join(" ")
-      .toLowerCase();
+    ].join(" ").toLowerCase();
 
+    const matches = archMatcher.search(text);
     const detected = new Set();
-    for (const [arch, keywords] of Object.entries(ARCH_KEYWORDS_LOWER)) {
-      if (keywords.some((kw) => text.includes(kw))) {
-        detected.add(arch);
-      }
+    for (const kw of matches.keys()) {
+      detected.add(keywordToArch[kw]);
     }
 
-    if (detected.size > 0) {
+    if (detected.size > 0 && repo.developerId != null) {
+      const devId = repo.developerId;
+      const bucket = devArchitectures.get(devId) ?? {};
       for (const arch of detected) {
-        if (repo.developerId != null) {
-          const devId = repo.developerId;
-          const bucket = devArchitectures.get(devId) ?? {};
-          bucket[arch] = (bucket[arch] ?? 0) + 1;
-          devArchitectures.set(devId, bucket);
-        }
+        bucket[arch] = (bucket[arch] ?? 0) + 1;
       }
+      devArchitectures.set(devId, bucket);
     }
-
-    await sleep(1000);
   }
 
   const devArchitectureRows = [];
   for (const [devId, bucket] of devArchitectures.entries()) {
     for (const [name, count] of Object.entries(bucket)) {
-      devArchitectureRows.push({
-        developerId: devId,
-        name,
-        count,
-      });
+      devArchitectureRows.push({ developerId: devId, name, count });
     }
   }
-  console.log("devArchitectureRows", devArchitectureRows);
-  // Replace after scan: failed runs keep prior rows; FK parents exist before insert.
-  if (developerId != null) {
-    await prisma.developerArchitecture.deleteMany({ where: { developerId } });
-  } else {
-    await prisma.developerArchitecture.deleteMany();
-    await prisma.architecture.deleteMany();
-  }
-  if (devArchitectureRows.length > 0) {
-    await ensureArchitectureRowsForKeywords();
-    await prisma.developerArchitecture.createMany({
-      data: devArchitectureRows,
-      skipDuplicates: true,
-    });
-  }
 
-  await rebuildArchitectureCatalogFromDeveloperLinks();
-
-  progress("Architecture detection complete", {
-    totalRepos: repos.length,
-    detectedArchitectureNames: devArchitectureRows.length,
+  await prisma.$transaction(async (tx) => {
+    if (developerId != null) {
+      await tx.developerArchitecture.deleteMany({ where: { developerId } });
+    } else {
+      await tx.developerArchitecture.deleteMany();
+      await tx.architecture.deleteMany();
+    }
+    if (devArchitectureRows.length > 0) {
+      await ensureArchitectureRowsForKeywords();
+      await tx.developerArchitecture.createMany({ data: devArchitectureRows, skipDuplicates: true });
+    }
   });
 
-  return {
-    skipped,
-    totalRepos: repos.length,
-    detectedArchitectureLinks: devArchitectureRows.length,
-  };
+  await rebuildArchitectureCatalogFromDeveloperLinks();
+  progress("Architecture detection complete", { totalRepos: repos.length, detectedArchitectureNames: devArchitectureRows.length });
+
+  return { skipped, totalRepos: repos.length, detectedArchitectureLinks: devArchitectureRows.length };
 }
 
 module.exports = detectDeveloperArchitectures;

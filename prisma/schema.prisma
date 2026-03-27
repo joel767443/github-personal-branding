@@ -222,6 +222,7 @@ model DeveloperTechStack {
   developer Developer @relation(fields: [developerId], references: [id], onDelete: Cascade)
 
   @@unique([developerId, name])
+  @@index([developerId])
   @@map("developer_tech_stacks")
 }
 
@@ -255,6 +256,7 @@ model DeveloperArchitecture {
   architecture Architecture @relation(fields: [name], references: [name], onDelete: Cascade)
 
   @@unique([developerId, name])
+  @@index([developerId])
   @@map("developer_architectures")
 }
 
