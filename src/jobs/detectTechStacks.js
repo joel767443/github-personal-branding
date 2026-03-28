@@ -109,7 +109,8 @@ async function detectTechStacks({ onProgress, developerId } = {}) {
       return sourceTs > processedTs;
     });
 
-    const repoDetections = await mapWithConcurrency(reposToProcess, 4, async (repo) => {
+    // Sort to process smaller/more recently updated first or just limit concurrency
+    const repoDetections = await mapWithConcurrency(reposToProcess, 1, async (repo) => {
       const repoRuleStack = {};
       const parsed = parseGitHubRepoUrl(repo.url);
       if (!parsed) return null;
@@ -129,14 +130,19 @@ async function detectTechStacks({ onProgress, developerId } = {}) {
         }
       }
 
+      // Filter rules: only process those where the file exists in the repo
+      const relevantFileBuckets = [];
       for (const [fileName, bucket] of rulesByFile.entries()) {
-        const hasEntryMatch = entryNames.some((n) => n.includes(fileName));
-        
+        const hasEntryMatch = entryNames.some((n) => n === fileName || n.includes(fileName));
+        if (hasEntryMatch) {
+          relevantFileBuckets.push({ fileName, bucket });
+        }
+      }
+
+      for (const { fileName, bucket } of relevantFileBuckets) {
         // Handle presence-only rules
         for (const rule of bucket.rules.filter(r => !r.keyword)) {
-          if (hasEntryMatch) {
-            repoRuleStack[rule.name] = (repoRuleStack[rule.name] ?? 0) + 1;
-          }
+          repoRuleStack[rule.name] = (repoRuleStack[rule.name] ?? 0) + 1;
         }
 
         // Handle keyword rules
@@ -144,7 +150,7 @@ async function detectTechStacks({ onProgress, developerId } = {}) {
           const fileInfo = filesByName.get(fileName);
           if (fileInfo) {
             try {
-              const resp = await axios.get(fileInfo.download_url, { responseType: "text" });
+              const resp = await axios.get(fileInfo.download_url, { responseType: "text", timeout: 10000 });
               const matches = bucket.matcher.search(String(resp.data));
               for (const rule of bucket.rules.filter(r => r.keyword)) {
                 const count = matches.get(rule.keyword.toLowerCase()) ?? 0;

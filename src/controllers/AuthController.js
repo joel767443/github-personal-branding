@@ -81,12 +81,15 @@ class AuthController {
         headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
       });
       const emailsJson = await emailsResp.json().catch(() => []);
-      const email = emailsJson?.find(e => e?.primary && e?.verified)?.email ?? 
-                    userJson?.login ? `${userJson.login}@users.noreply.github.com` : null;
+      const email = emailsJson?.find(e => e?.primary && e?.verified)?.email;
 
-      if (!email) return respondError(res, 400, "No email", "GitHub did not return an email");
+      if (!email) return respondError(res, 400, "No email", "GitHub did not return a verified primary email. Please check your GitHub email settings.");
 
-      let developer = await prisma.developer.findUnique({ where: { email } });
+      let developer = await prisma.developer.findUnique({ where: { githubLogin: userJson.login } });
+      if (!developer) {
+        developer = await prisma.developer.findUnique({ where: { email } });
+      }
+
       const nameParts = (userJson.name || "").split(" ").filter(Boolean);
       const firstName = nameParts[0] ?? userJson.login;
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : null;

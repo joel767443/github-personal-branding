@@ -17,9 +17,16 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
   }
 
   const github = createGithubClient(creds.token);
-  const username = githubUsername ?? creds.username ?? null;
+  let username = githubUsername ?? creds.username ?? null;
+  
   if (!username) {
-    throw new Error('GitHub username is missing for this developer; reconnect GitHub OAuth.');
+    progress('Resolving GitHub username from token');
+    const userResp = await github.get('/user');
+    username = userResp.data.login;
+  }
+  
+  if (!username) {
+    throw new Error('GitHub username is missing for this developer; reconnect GitHub OAuth or provide a token.');
   }
 
   progress('Fetching repositories');
@@ -27,7 +34,11 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
 
   progress('Getting user details');
   const profile = await getUserProfile(github, username);
-  const email = profile.email ?? `${username}@users.noreply.github.com`;
+  const email = profile.email;
+
+  if (!email) {
+    throw new Error(`GitHub user ${username} does not have a public email address. Please make your email public in GitHub profile settings or reconnect via OAuth to sync.`);
+  }
 
   const nameParts = typeof profile.name === 'string' ? profile.name.split(' ').filter(Boolean) : [];
   const firstName = nameParts[0] ?? profile.login ?? null;
@@ -43,6 +54,7 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
     jobTitle: profile.bio ?? null,
     summaryFromHost: profile.bio ?? null,
     hireable: typeof profile.hireable === 'boolean' ? profile.hireable : null,
+    githubLogin: profile.login ?? username,
   });
 
   if (developerId != null && developerIdResolved !== developerId) {
@@ -67,6 +79,14 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
       continue;
     }
 
+    // Optimization: Skip re-syncing repos that haven't changed since last sync
+    const existingRepo = await prisma.repo.findUnique({
+      where: { id: repo.id.toString() },
+      select: { updatedAt: true }
+    });
+    const repoUpdatedAt = new Date(repo.updated_at);
+    const hasChanged = !existingRepo || repoUpdatedAt.getTime() > existingRepo.updatedAt.getTime();
+
     progress(`Saving repositories - ${repo.name}`, { repoName: repo.name });
     const savedRepo = await developerPortfolioPersistence.upsertGithubRepo({
       id: repo.id.toString(),
@@ -76,9 +96,14 @@ async function syncGithub({ onProgress, githubUsername, developerId } = {}) {
       private: repo.private,
       url: repo.html_url,
       createdAt: new Date(repo.created_at),
-      updatedAt: new Date(repo.updated_at),
+      updatedAt: repoUpdatedAt,
       developerId: developerIdResolved,
     });
+
+    if (!hasChanged) {
+      console.log(`Repo ${repo.name} unchanged, skipping sub-resource sync`);
+      continue;
+    }
 
     console.log(`Synced repo: ${repo.name}`);
 

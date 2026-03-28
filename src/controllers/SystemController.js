@@ -18,9 +18,14 @@ class SystemController {
       } else if (!developer) {
         wizardStep = "sync";
       } else {
-        const linkedinCount = await prisma.developerLinkedinSkill.count({ where: { developerId: developer.id } });
-        if (linkedinCount === 0) {
-          wizardStep = "upload";
+        const needsDeveloperCredentials = await this.checkNeedsCredentials(developer.id);
+        if (needsDeveloperCredentials) {
+          wizardStep = "sync";
+        } else {
+          const linkedinCount = await prisma.developerLinkedinSkill.count({ where: { developerId: developer.id } });
+          if (linkedinCount === 0) {
+            wizardStep = "upload";
+          }
         }
       }
 
@@ -32,6 +37,7 @@ class SystemController {
       const health = developer ? await healthSnapshot({ developerId: developer.id }) : null;
       
       const needsDeveloperCredentials = developer ? await this.checkNeedsCredentials(developer.id) : false;
+      const needsLinkedInCredentials = developer ? await this.checkNeedsLinkedInCredentials(developer.id) : false;
 
       res.json({
         authenticated,
@@ -39,6 +45,7 @@ class SystemController {
         wizardStep,
         missing,
         needsDeveloperCredentials,
+        needsLinkedInCredentials,
         linkedinCompleted: wizardStep === "completed",
         linkedinImportInProgress: health?.lastLinkedin?.status === "running",
         syncInProgress: health?.lastSync?.status === "running",
@@ -56,6 +63,14 @@ class SystemController {
     // If we have a global GITHUB_TOKEN, we might not "need" them, but usually this flag 
     // triggers the PAT entry card.
     return !dev?.githubPatEnc && !process.env.GITHUB_TOKEN;
+  }
+
+  async checkNeedsLinkedInCredentials(developerId) {
+    const dev = await prisma.developer.findUnique({
+      where: { id: developerId },
+      select: { linkedinAccessTokenEnc: true, linkedinPersonId: true }
+    });
+    return !dev?.linkedinAccessTokenEnc || !dev?.linkedinPersonId;
   }
 }
 

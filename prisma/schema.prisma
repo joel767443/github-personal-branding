@@ -66,7 +66,7 @@ model Developer {
   user   User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   /// GitHub login from OAuth (for job run correlation)
-  githubLogin   String? @map("github_login")
+  githubLogin   String? @unique @map("github_login")
   /// Override for API sync; falls back to githubLogin or email-derived handle
   githubUsername String? @map("github_username")
 

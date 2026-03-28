@@ -215,8 +215,8 @@ class DeveloperPortfolioPersistence {
   }
 
   /**
-   * Upsert developer by email; preserves summary when LinkedIn summary already set (GitHub sync behavior).
-   * @param {import('./dtos').GithubDeveloperUpsertInput} input
+   * Upsert developer by email or githubLogin; preserves summary when LinkedIn summary already set (GitHub sync behavior).
+   * @param {import('./dtos').GithubDeveloperUpsertInput & { githubLogin?: string }} input
    * @returns {Promise<{ id: number, email: string }>}
    */
   async upsertDeveloperForGithubActivity(input) {
@@ -230,40 +230,57 @@ class DeveloperPortfolioPersistence {
       jobTitle,
       summaryFromHost,
       hireable,
+      githubLogin,
     } = input;
 
-    const existingDeveloper = await prisma.developer.findUnique({
-      where: { email },
-      select: { linkedinSummary: true },
-    });
+    // 1. Try lookup by githubLogin if available (more stable than email from profile API)
+    let existingDeveloper = null;
+    if (githubLogin) {
+      existingDeveloper = await prisma.developer.findUnique({
+        where: { githubLogin },
+        select: { id: true, email: true, linkedinSummary: true },
+      });
+    }
+
+    // 2. Fallback to email lookup
+    if (!existingDeveloper && email) {
+      existingDeveloper = await prisma.developer.findUnique({
+        where: { email },
+        select: { id: true, email: true, linkedinSummary: true },
+      });
+    }
+
     const hasLinkedinSummary = Boolean(
       existingDeveloper?.linkedinSummary && String(existingDeveloper.linkedinSummary).trim(),
     );
 
-    const developer = await prisma.developer.upsert({
-      where: { email },
-      update: {
-        firstName,
-        lastName,
-        profilePic: profilePic ?? null,
-        mobileNumber: mobileNumber ?? null,
-        headline: headline ?? null,
-        jobTitle: jobTitle ?? null,
-        ...(!hasLinkedinSummary ? { summary: summaryFromHost ?? null } : {}),
-        hireable: typeof hireable === 'boolean' ? hireable : null,
-      },
-      create: {
-        email,
-        firstName,
-        lastName,
-        profilePic: profilePic ?? null,
-        mobileNumber: mobileNumber ?? null,
-        headline: headline ?? null,
-        jobTitle: jobTitle ?? null,
-        summary: summaryFromHost ?? null,
-        hireable: typeof hireable === 'boolean' ? hireable : null,
-      },
-    });
+    const updateData = {
+      firstName,
+      lastName,
+      profilePic: profilePic ?? null,
+      mobileNumber: mobileNumber ?? null,
+      headline: headline ?? null,
+      jobTitle: jobTitle ?? null,
+      ...(!hasLinkedinSummary ? { summary: summaryFromHost ?? null } : {}),
+      hireable: typeof hireable === 'boolean' ? hireable : null,
+      githubLogin: githubLogin ?? undefined,
+    };
+
+    let developer;
+    if (existingDeveloper) {
+      developer = await prisma.developer.update({
+        where: { id: existingDeveloper.id },
+        data: updateData,
+      });
+    } else {
+      developer = await prisma.developer.create({
+        data: {
+          email,
+          ...updateData,
+          githubLogin: githubLogin ?? null,
+        },
+      });
+    }
 
     return { id: developer.id, email: developer.email };
   }

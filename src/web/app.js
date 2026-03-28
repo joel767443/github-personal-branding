@@ -43,16 +43,16 @@ function applyLinkedinUploadUiVisibility(status) {
   if (!status) return;
   const showSetup = status.wizardStep === "setup";
   const showLogin = status.wizardStep === "login";
+  const showSync = status.wizardStep === "sync";
   const shouldForceUploadGate =
     Boolean(status.authenticated) &&
     !showSetup &&
     !showLogin &&
     !Boolean(status.needsDeveloperCredentials) &&
     !Boolean(status.linkedinCompleted) &&
-    !Boolean(status.linkedinImportInProgress);
-  const showUploadCard = !showSetup && !showLogin && (status.wizardStep === "upload" || shouldForceUploadGate);
-  const uploadGateRoot = document.getElementById("linkedinUploadGateRoot");
-  setHidden(uploadGateRoot, !showUploadCard);
+    !Boolean(status.linkedinImportInProgress) &&
+    !showSync;
+  const showUploadCard = status.wizardStep === "upload";//!showSetup && !showLogin && (status.wizardStep === "upload" || (shouldForceUploadGate && !status.needsDeveloperCredentials));
   const needsLi = Boolean(status.needsLinkedInCredentials);
   const linkedinCredentialsSection = document.getElementById("linkedinCredentialsSection");
   if (linkedinCredentialsSection) {
@@ -136,6 +136,7 @@ const statRunningJobs = document.getElementById("statRunningJobs");
 const statFailures24h = document.getElementById("statFailures24h");
 const statSocialPosts30d = document.getElementById("statSocialPosts30d");
 const statLastJobStatus = document.getElementById("statLastJobStatus");
+const linkedinUploadGateRoot = document.getElementById("linkedinUploadGateRoot");
 const dataPageCard = document.getElementById("dataPageCard");
 const dataPageTitle = document.getElementById("dataPageTitle");
 const dataPageSubtitle = document.getElementById("dataPageSubtitle");
@@ -772,8 +773,9 @@ async function refreshStatus() {
       !showLogin &&
       !Boolean(status.needsDeveloperCredentials) &&
       !Boolean(status.linkedinCompleted) &&
-      !Boolean(status.linkedinImportInProgress);
-    const showUploadStep = status.wizardStep === "upload" || shouldForceUploadGate;
+      !Boolean(status.linkedinImportInProgress) &&
+      !showSync;
+    const showUploadStep = status.wizardStep === "upload";
     const uploadPipelineStarted =
       sessionStorage.getItem(POST_UPLOAD_DASHBOARD_KEY) === "1" &&
       (status.syncInProgress || status.linkedinImportInProgress);
@@ -800,7 +802,11 @@ async function refreshStatus() {
       Boolean(route) &&
       (route.kind === "dashboard" || route.kind === "data");
     const showUploadGateExclusive = showUploadStep && !uploadPipelineStarted;
-    const showTokenGateExclusive = showTokenRequiredCard || showUploadGateExclusive;
+    const isWizardIncomplete = (status.needsDeveloperCredentials || !status.linkedinCompleted) && !uploadPipelineStarted;
+    const showTokenGateExclusive = (showTokenRequiredCard || (showUploadGateExclusive && !showDataPageCard) || (showSync && !showDataPageCard)) && !uploadPipelineStarted;
+    // Step 2 (LinkedIn upload) should be visible even on data pages (like /profile) if it's the current wizard step,
+    // though it might not be "exclusive" (blocking).
+    const showTokenGateRoot = showTokenGateExclusive || (showUploadGateExclusive && status.authenticated) || (showSync && !showDataPageCard);
 
     // Dashboard is only `/dashboard`, never on `/`, setup, login, or other routes.
     const showDashboard =
@@ -810,19 +816,21 @@ async function refreshStatus() {
       !postSetupAwaitingAuth &&
       (isDashboardRoute || (showUploadStep && uploadPipelineStarted));
 
-    // Hide shell on setup/login/post-setup, and while upload gate is still blocking.
-    const hideShell = showSetup || showLogin || postSetupAwaitingAuth || showUploadGateExclusive;
-    setHidden(sidebarEl, hideShell);
-    setHidden(topNavEl, hideShell);
-    setHidden(githubTokenGateRoot, !showTokenGateExclusive);
-    setHidden(githubTokenRequiredCard, !showTokenRequiredCard || hideShell);
-
     const showDataPageCard =
       !postSetupAwaitingAuth && !showSetup && !showLogin && Boolean(route) && route.kind === "data";
+
+    // Hide shell on setup/login/post-setup, and while upload gate is still blocking.
+    const hideShell = showSetup || showLogin || postSetupAwaitingAuth || (isWizardIncomplete && (showSync || showUploadStep) && !showDataPageCard) || (status.authenticated && !status.user?.login && !uploadPipelineStarted && !showDataPageCard);
+    setHidden(sidebarEl, hideShell);
+    setHidden(topNavEl, hideShell);
+    setHidden(githubTokenGateRoot, !showTokenGateRoot);
+    setHidden(githubTokenRequiredCard, !status.needsDeveloperCredentials || !status.authenticated || showUploadGateExclusive);
+    setHidden(linkedinUploadGateRoot, !showUploadGateExclusive || !status.authenticated);
+
     setHidden(dataPageCard, !showDataPageCard || showTokenGateExclusive);
 
     const showDashboardCard = showDashboard && !postSetupAwaitingAuth;
-    setHidden(dashboardCard, !showDashboardCard || showTokenGateExclusive);
+    setHidden(dashboardCard, !showDashboardCard || (showTokenGateExclusive && !uploadPipelineStarted));
     const showSettingsCard = showDataPageCard && isProfilePage && !showTokenGateExclusive;
     setHidden(settingsCard, !showSettingsCard || showTokenGateExclusive);
     if (settingsCard && settingsCardMountDefault && settingsCardMountProfile) {
@@ -840,6 +848,8 @@ async function refreshStatus() {
           ? "Sync GitHub Data"
           : showUploadGateExclusive
             ? "Upload LinkedIn Export"
+          : showSync
+            ? "GitHub Sync"
           : route
               ? (route.title || "Data")
               : forceUploadUi
@@ -848,7 +858,7 @@ async function refreshStatus() {
     );
 
     const showAuthCard = (showSetup || showLogin) && !postSetupAwaitingAuth && !showUploadGateExclusive;
-    setHidden(loginCard, !showAuthCard || showTokenGateExclusive);
+    setHidden(loginCard, !showAuthCard || (showTokenGateExclusive && !showSetup && !showLogin));
     if (serverConfigHint) {
       if (showSetup && (status.missing?.length ?? 0) > 0) {
         serverConfigHint.textContent = `Server configuration incomplete: ${status.missing.join(", ")}. Set these in your environment or .env file (for example DATABASE_URL and SESSION_SECRET).`;
@@ -859,7 +869,7 @@ async function refreshStatus() {
     }
     // Sync GitHub: on `/profile` during normal flow; on post-setup mount when shell is minimal (before GitHub sign-in).
     const showSyncCard =
-      !showTokenGateExclusive && (postSetupAwaitingAuth || (showSync && !forceUploadUi && isProfilePage));
+      !showTokenGateRoot && (postSetupAwaitingAuth || (showSync && !forceUploadUi && (isProfilePage || (window.location.pathname || "/") === "/")));
     setHidden(syncCard, !showSyncCard);
     if (syncCard && syncCardMountPostSetup && syncCardMountProfile) {
       if (showSyncCard) {
@@ -908,7 +918,7 @@ async function refreshStatus() {
       showSetup ||
       !status.authenticated ||
       forceUploadUi ||
-      showTokenGateExclusive ||
+      showTokenGateRoot ||
       (route && route.kind !== "dashboard")
     ) {
       clearDashboard();
@@ -918,7 +928,7 @@ async function refreshStatus() {
     if (
       !showSetup &&
       !showLogin &&
-      !showTokenRequiredCard &&
+      !status.needsDeveloperCredentials &&
       status.authenticated &&
       route?.kind === "data"
     ) {
@@ -1221,6 +1231,9 @@ async function submitGithubPat() {
     if (githubPatInput) githubPatInput.value = "";
     await loadSettingsForm();
     await refreshStatus();
+    if (statusCache?.wizardStep === "upload") {
+       window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   } catch (err) {
     if (githubPatMsg) githubPatMsg.textContent = err.message || String(err);
   } finally {

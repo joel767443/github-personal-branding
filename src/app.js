@@ -104,6 +104,7 @@ app.post('/api/billing/checkout', requireLogin, billingController.checkout.bind(
 app.post('/api/billing/portal', requireLogin, billingController.portal.bind(billingController));
 
 // Sync & Upload
+app.get('/sync/progress', requireLogin, syncController.syncProgress.bind(syncController));
 app.post('/sync/start', requireLogin, syncController.startSync.bind(syncController));
 app.post('/upload/linkedin', requireLogin, upload.single("linkedinZip"), syncController.uploadLinkedin.bind(syncController));
 

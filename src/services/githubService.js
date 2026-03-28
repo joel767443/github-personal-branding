@@ -28,12 +28,18 @@ function attachRateLimiter(instance) {
       const { config, response } = error;
       if (response && response.status === 403 && response.headers['x-ratelimit-remaining'] === '0') {
         const resetTime = parseInt(response.headers['x-ratelimit-reset'], 10) * 1000;
-        const waitTime = resetTime - Date.now() + 1000;
+        const waitTime = resetTime - Date.now() + 2000; // Adding 2s safety buffer
         if (waitTime > 0) {
           console.warn(`GitHub Rate Limit Exceeded. Waiting for ${waitTime / 1000}s...`);
           await sleep(waitTime);
           return instance(config);
         }
+      }
+      if (response && response.status === 403 && response.headers['retry-after']) {
+        const waitTime = parseInt(response.headers['retry-after'], 10) * 1000 + 2000;
+        console.warn(`GitHub Secondary Rate Limit. Waiting for ${waitTime / 1000}s...`);
+        await sleep(waitTime);
+        return instance(config);
       }
       return Promise.reject(error);
     }

@@ -10,3 +10,4 @@ uploads/*
 !uploads/.gitkeep
 
 portfolio/*
+.idea

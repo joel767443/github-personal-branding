@@ -11,7 +11,9 @@ const { decryptField } = require('../crypto/fieldEncryption');
  */
 async function getGithubCredentialsForDeveloper(developerId) {
   if (developerId == null || Number.isNaN(Number(developerId))) {
-    return null;
+    const token = String(mergedEnv().GITHUB_TOKEN ?? '').trim();
+    if (!token) return null;
+    return { token, username: null };
   }
 
   const dev = await prisma.developer.findUnique({

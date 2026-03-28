@@ -52,6 +52,9 @@ class SettingsController {
         const validated = await this.validateGithubPat(body.githubPat);
         if (!validated.ok) return respondError(res, 400, "Invalid GitHub token", validated.details);
         data.githubPatEnc = encryptField(body.githubPat);
+        if (req.session.wizardStep === "sync") {
+          delete req.session.wizardStep;
+        }
       }
 
       if (Object.keys(data).length) {

@@ -1,12 +1,9 @@
 const prisma = require("../db/prisma");
 
 function resolveSessionEmail(req) {
-  const login = req.session?.user?.login;
-  const emailFromSession = req.session?.user?.email;
-  const emailFallback = login ? `${login}@users.noreply.github.com` : null;
   return {
-    login,
-    email: emailFromSession ?? emailFallback,
+    login: req.session?.user?.login,
+    email: req.session?.user?.email,
   };
 }
 

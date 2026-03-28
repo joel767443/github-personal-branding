@@ -16,6 +16,30 @@ class SyncController {
     this.linkedinInProgress = false;
   }
 
+  async syncProgress(req, res) {
+    const { developer } = await resolveDeveloperFromSession(req);
+    if (!developer) return res.status(401).end();
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    const send = (data) => {
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const history = progressBus.lastEventsFor(developer.id);
+    for (const h of history) send(h);
+
+    const unsubscribe = progressBus.subscribeForDeveloper(developer.id, send);
+
+    req.on("close", () => {
+      unsubscribe();
+      res.end();
+    });
+  }
+
   async startSync(req, res) {
     const started = await this.runSyncPipelineInternal(req);
     if (!started.started) {
@@ -28,13 +52,17 @@ class SyncController {
   }
 
   async runSyncPipelineInternal(req) {
-    const { developer, login } = await resolveDeveloperFromSession(req);
+    const { developer, login: sessionLogin } = await resolveDeveloperFromSession(req);
     const developerId = developer?.id ?? null;
+    const login = sessionLogin ?? null;
     
     try {
       await assertCanRunPaidJobs(developerId);
     } catch (err) {
-      return { started: false, reason: "subscription", message: err.message };
+      // If developer doesn't exist yet, we allow the first sync (trialing)
+      if (developerId !== null) {
+        return { started: false, reason: "subscription", message: err.message };
+      }
     }
 
     const runId = `run_${Date.now()}`;
@@ -75,8 +103,16 @@ class SyncController {
 
   async uploadLinkedin(req, res) {
     if (!req.file) return respondError(res, 400, "No file", "Select a ZIP file");
-    const { developer, login } = await resolveDeveloperFromSession(req);
-    if (!developer) return respondError(res, 404, "No developer record", "Sync first");
+    const { developer, login: sessionLogin } = await resolveDeveloperFromSession(req);
+    const login = sessionLogin ?? null;
+
+    if (!developer) {
+      // For initial setup, we can trigger sync first if GITHUB_TOKEN is available.
+      // But usually user should have synced. Let's make it easier.
+      // If no developer, we still need a developer ID to save the zip.
+      // We can't easily proceed without developerId.
+      return respondError(res, 404, "No developer record", "Please click 'Start Sync' first to initialize your profile.");
+    }
 
     try {
       await assertCanRunPaidJobs(developer.id);
